@@ -9,16 +9,11 @@ module;
 
 #include "config.h"
 
-export module jt.buffer;
+export module jt.detail.buffer;
 
-namespace jt::impl {
+import jt.detail.allocator;
 
-JT_API void* buffer_allocate(size_t size);
-JT_API void buffer_deallocate(void* ptr, size_t size);
-
-}  // namespace jt::impl
-
-export namespace jt {
+export namespace jt::detail {
 
 class read_buffer {
   public:
@@ -274,7 +269,7 @@ class base_memory_buffer : public channel_buffer {
 
     ~base_memory_buffer() noexcept {
         if (using_heap_) {
-            impl::buffer_deallocate(data_, capacity_);
+            deallocate(data_, capacity_);
         }
     }
 
@@ -286,7 +281,7 @@ class base_memory_buffer : public channel_buffer {
 
     void release() {
         if (using_heap_) {
-            impl::buffer_deallocate(data_, capacity_);
+            deallocate(data_, capacity_);
             data_ = store_;
             capacity_ = Fixed;
             using_heap_ = false;
@@ -325,7 +320,7 @@ class base_memory_buffer : public channel_buffer {
     base_memory_buffer& operator=(base_memory_buffer&& other) noexcept {
         if (this != std::addressof(other)) {
             if (using_heap_) {
-                impl::buffer_deallocate(data_, capacity_);
+                deallocate(data_, capacity_);
             }
 
             if (other.using_heap_) {
@@ -395,10 +390,10 @@ class base_memory_buffer : public channel_buffer {
         auto* old_data = data_;
         const auto old_capacity = capacity_;
 
-        void* new_data = impl::buffer_allocate(new_capacity);
+        void* new_data = allocate(new_capacity);
         std::memcpy(new_data, old_data, write_);
         if (using_heap_) {
-            impl::buffer_deallocate(old_data, old_capacity);
+            deallocate(old_data, old_capacity);
         }
 
         data_ = new_data;
@@ -410,4 +405,14 @@ class base_memory_buffer : public channel_buffer {
     bool using_heap_{false};
 };
 
-}  // namespace jt
+template class JT_API base_memory_buffer<1024>;
+template class JT_API base_memory_buffer<2048>;
+template class JT_API base_memory_buffer<4096>;
+template class JT_API base_memory_buffer<8192>;
+
+using buffer_1k = base_memory_buffer<1024>;
+using buffer_2k = base_memory_buffer<2048>;
+using buffer_4k = base_memory_buffer<4096>;
+using buffer_8k = base_memory_buffer<8192>;
+
+}  // namespace jt::detail

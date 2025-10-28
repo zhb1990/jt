@@ -1,3 +1,3 @@
 export module jt;
 
-export import jt.buffer;
+export import jt.detail.buffer;

@@ -14,6 +14,7 @@ project(jt)
 file(GLOB JT_MODULES
     "src/detail/cache_line.cppm"
     "src/detail/cpu_pause.cppm"
+    "src/detail/allocator.cppm"
     "src/detail/buffer.cppm"
     "src/jt.cppm"
 )
@@ -23,7 +24,7 @@ file(GLOB JT_HEAEDERS
 )
 
 file(GLOB JT_SOURCES
-    "src/detail/impl/buffer_impl.cpp"
+    "src/detail/allocator.cpp"
 )
 
 add_library(libjt SHARED)

@@ -6,9 +6,9 @@ module;
 #endif
 #endif
 
-export module jt.cpu_pause;
+export module jt.detail.cpu_pause;
 
-export namespace jt {
+export namespace jt::detail {
 
 inline void cpu_pause() noexcept {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
