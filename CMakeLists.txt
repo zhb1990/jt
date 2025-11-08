@@ -9,6 +9,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_MODULE_STD ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# 检测是否为 Apple 平台，并设置 SDKROOT
+if(APPLE)
+    find_program(CMAKE_XCRUN xcrun REQUIRED)
+    execute_process(
+        COMMAND ${CMAKE_XCRUN} --show-sdk-path
+        OUTPUT_VARIABLE CMAKE_OSX_SYSROOT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
+endif()
+
 project(jt)
 
 file(GLOB JT_MODULES
