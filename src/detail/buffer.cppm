@@ -1,17 +1,11 @@
 module;
 
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
-#include <iterator>
-#include <memory>
-#include <string_view>
-
 #include "config.h"
 
 export module jt.detail.buffer;
 
 import jt.detail.allocator;
+import std;
 
 export namespace jt::detail {
 
@@ -19,7 +13,7 @@ class read_buffer {
   public:
     constexpr read_buffer() = default;
 
-    constexpr read_buffer(const void* ptr, size_t capacity) : ptr_(ptr), capacity_(capacity) {}
+    constexpr read_buffer(const void* ptr, std::size_t capacity) : ptr_(ptr), capacity_(capacity) {}
 
     constexpr explicit read_buffer(const std::string_view& strv) : ptr_(strv.data()), capacity_(strv.size()) {}
 
@@ -46,24 +40,24 @@ class read_buffer {
         return *this;
     }
 
-    [[nodiscard]] constexpr const uint8_t* begin() const { return static_cast<const uint8_t*>(ptr_) + read_; }
+    [[nodiscard]] constexpr const std::uint8_t* begin() const { return static_cast<const std::uint8_t*>(ptr_) + read_; }
 
-    [[nodiscard]] constexpr const uint8_t* end() const { return static_cast<const uint8_t*>(ptr_) + capacity_; }
+    [[nodiscard]] constexpr const std::uint8_t* end() const { return static_cast<const std::uint8_t*>(ptr_) + capacity_; }
 
     [[nodiscard]] constexpr const void* data() const { return ptr_; }
 
-    [[nodiscard]] constexpr size_t capacity() const { return capacity_; }
+    [[nodiscard]] constexpr std::size_t capacity() const { return capacity_; }
 
-    [[nodiscard]] constexpr size_t readable() const { return capacity_ - read_; }
+    [[nodiscard]] constexpr std::size_t readable() const { return capacity_ - read_; }
 
-    inline size_t read(void* dest, size_t size) {
+    inline std::size_t read(void* dest, std::size_t size) {
         size = (std::min)(readable(), size);
         std::memcpy(dest, begin(), size);
         read_ += size;
         return size;
     }
 
-    constexpr read_buffer& operator+=(size_t bytes) noexcept {
+    constexpr read_buffer& operator+=(std::size_t bytes) noexcept {
         read_ = (std::min)(read_ + bytes, capacity_);
         return *this;
     }
@@ -78,15 +72,15 @@ class read_buffer {
 
   private:
     const void* ptr_{nullptr};
-    size_t capacity_{0};
-    size_t read_{0};
+    std::size_t capacity_{0};
+    std::size_t read_{0};
 };
 
 class channel_buffer {
   public:
     constexpr channel_buffer() = default;
 
-    constexpr channel_buffer(void* ptr, const size_t capacity, const size_t prependable = 0) : data_(ptr), capacity_(capacity) {
+    constexpr channel_buffer(void* ptr, const std::size_t capacity, const std::size_t prependable = 0) : data_(ptr), capacity_(capacity) {
         if (prependable <= capacity) {
             read_ = prependable;
             write_ = prependable;
@@ -120,25 +114,25 @@ class channel_buffer {
         return *this;
     }
 
-    [[nodiscard]] constexpr const uint8_t* begin_read() const { return static_cast<const uint8_t*>(data_) + read_; }
+    [[nodiscard]] constexpr const std::uint8_t* begin_read() const { return static_cast<const std::uint8_t*>(data_) + read_; }
 
-    [[nodiscard]] constexpr const uint8_t* end_read() const { return static_cast<const uint8_t*>(data_) + write_; }
+    [[nodiscard]] constexpr const std::uint8_t* end_read() const { return static_cast<const std::uint8_t*>(data_) + write_; }
 
-    [[nodiscard]] constexpr uint8_t* begin() { return static_cast<uint8_t*>(data_) + write_; }
+    [[nodiscard]] constexpr std::uint8_t* begin() { return static_cast<std::uint8_t*>(data_) + write_; }
 
-    [[nodiscard]] constexpr uint8_t* end() { return static_cast<uint8_t*>(data_) + capacity_; }
+    [[nodiscard]] constexpr std::uint8_t* end() { return static_cast<std::uint8_t*>(data_) + capacity_; }
 
     [[nodiscard]] constexpr void* data() { return data_; }
 
     [[nodiscard]] constexpr const void* data() const { return data_; }
 
-    [[nodiscard]] constexpr size_t readable() const { return write_ - read_; }
+    [[nodiscard]] constexpr std::size_t readable() const { return write_ - read_; }
 
-    [[nodiscard]] constexpr size_t writable() const { return capacity_ - write_; }
+    [[nodiscard]] constexpr std::size_t writable() const { return capacity_ - write_; }
 
-    [[nodiscard]] constexpr size_t capacity() const { return capacity_; }
+    [[nodiscard]] constexpr std::size_t capacity() const { return capacity_; }
 
-    [[nodiscard]] constexpr size_t prependable() const { return read_; }
+    [[nodiscard]] constexpr std::size_t prependable() const { return read_; }
 
     void shrink() noexcept {
         if (read_ == 0) return;
@@ -163,13 +157,13 @@ class channel_buffer {
         return {reinterpret_cast<const char*>(begin_read()), size};
     }
 
-    constexpr void clear(size_t prependable = 0) noexcept {
+    constexpr void clear(std::size_t prependable = 0) noexcept {
         prependable = (std::min)(prependable, capacity_);
         read_ = prependable;
         write_ = prependable;
     }
 
-    inline void append(const void* buf, size_t len) {
+    inline void append(const void* buf, std::size_t len) {
         len = (std::min)(len, writable());
         std::memmove(begin(), buf, len);
         written(len);
@@ -179,33 +173,33 @@ class channel_buffer {
 
     inline void append(std::string_view strv) { return append(strv.data(), strv.size()); }
 
-    inline void append(const char* str) { return append(str, strlen(str)); }
+    inline void append(const char* str) { return append(str, std::strlen(str)); }
 
-    [[nodiscard]] size_t peek(void* buf, size_t sz) const noexcept {
+    [[nodiscard]] std::size_t peek(void* buf, std::size_t sz) const noexcept {
         sz = (std::min)(sz, readable());
-        memmove(buf, begin_read(), sz);
+        std::memmove(buf, begin_read(), sz);
         return sz;
     }
 
-    [[nodiscard]] size_t rpeek(void* buf, size_t sz) const noexcept {
+    [[nodiscard]] std::size_t rpeek(void* buf, std::size_t sz) const noexcept {
         sz = (std::min)(sz, readable());
-        memmove(buf, end_read() - sz, sz);
+        std::memmove(buf, end_read() - sz, sz);
         return sz;
     }
 
-    bool prepend(const void* buf, size_t len) noexcept {
+    bool prepend(const void* buf, std::size_t len) noexcept {
         if (prependable() < len) return false;
 
-        std::memmove(static_cast<uint8_t*>(data_) + read_ - len, buf, len);
+        std::memmove(static_cast<std::uint8_t*>(data_) + read_ - len, buf, len);
         read_ -= len;
         return true;
     }
 
-    constexpr void written(size_t sz) noexcept { write_ += (std::min)(sz, writable()); }
+    constexpr void written(std::size_t sz) noexcept { write_ += (std::min)(sz, writable()); }
 
-    constexpr void read(size_t sz) noexcept { read_ += (std::min)(sz, readable()); }
+    constexpr void read(std::size_t sz) noexcept { read_ += (std::min)(sz, readable()); }
 
-    constexpr void read_until(const uint8_t* end) noexcept {
+    constexpr void read_until(const std::uint8_t* end) noexcept {
         if (end > begin_read() && end <= end_read()) {
             read_ += end - begin_read();
         }
@@ -213,17 +207,17 @@ class channel_buffer {
 
   protected:
     void* data_{nullptr};
-    size_t capacity_{0};
-    size_t read_{0};
-    size_t write_{0};
+    std::size_t capacity_{0};
+    std::size_t read_{0};
+    std::size_t write_{0};
 };
 
-template <size_t Fixed>
+template <std::size_t Fixed>
 class base_memory_buffer : public channel_buffer {
   public:
     static_assert(Fixed > 0, "Fixed must > 0");
 
-    explicit base_memory_buffer(size_t prependable = 0) : channel_buffer(store_, Fixed, prependable), using_heap_(false) {}
+    explicit base_memory_buffer(std::size_t prependable = 0) : channel_buffer(store_, Fixed, prependable), using_heap_(false) {}
 
     base_memory_buffer(const base_memory_buffer& other) : base_memory_buffer(0) {
         reserve(other.capacity_);
@@ -232,7 +226,7 @@ class base_memory_buffer : public channel_buffer {
         std::memcpy(data_, other.data_, write_);
     }
 
-    template <size_t FixedOther>
+    template <std::size_t FixedOther>
     explicit base_memory_buffer(const base_memory_buffer<FixedOther>& other) : base_memory_buffer(0) {
         reserve(other.capacity_);
         read_ = other.read_;
@@ -265,7 +259,7 @@ class base_memory_buffer : public channel_buffer {
 
     explicit base_memory_buffer(const read_buffer& buf) { append(buf); }
 
-    base_memory_buffer(const void* ptr, size_t len) { append(ptr, len); }
+    base_memory_buffer(const void* ptr, std::size_t len) { append(ptr, len); }
 
     ~base_memory_buffer() noexcept {
         if (using_heap_) {
@@ -273,7 +267,7 @@ class base_memory_buffer : public channel_buffer {
         }
     }
 
-    void reserve(size_t size) {
+    void reserve(std::size_t size) {
         if (size > capacity_) {
             grow(size);
         }
@@ -290,7 +284,7 @@ class base_memory_buffer : public channel_buffer {
         clear();
     }
 
-    void make_sure_writable(size_t len) {
+    void make_sure_writable(std::size_t len) {
         if (const auto sz = writable(); sz < len) {
             grow(capacity_ + len - sz);
         }
@@ -307,7 +301,7 @@ class base_memory_buffer : public channel_buffer {
         return *this;
     }
 
-    template <size_t FixedOther>
+    template <std::size_t FixedOther>
     base_memory_buffer& operator=(const base_memory_buffer<FixedOther>& other) {
         reserve(other.capacity_);
         read_ = other.read_;
@@ -346,7 +340,7 @@ class base_memory_buffer : public channel_buffer {
         return *this;
     }
 
-    inline void append(const void* buf, size_t len) {
+    inline void append(const void* buf, std::size_t len) {
         make_sure_writable(len);
         return channel_buffer::append(buf, len);
     }
@@ -355,7 +349,7 @@ class base_memory_buffer : public channel_buffer {
 
     inline void append(const read_buffer& buf) { return append(buf.begin(), buf.readable()); }
 
-    inline void append(const char* str) { return base_memory_buffer::append(str, strlen(str)); }
+    inline void append(const char* str) { return base_memory_buffer::append(str, std::strlen(str)); }
 
     using channel_buffer::begin;
     using channel_buffer::begin_read;
@@ -378,9 +372,9 @@ class base_memory_buffer : public channel_buffer {
     using channel_buffer::written;
 
   private:
-    void grow(size_t size) {
-        constexpr size_t max_size = static_cast<size_t>(-1);
-        size_t new_capacity = capacity_ + capacity_ / 2;
+    void grow(std::size_t size) {
+        constexpr std::size_t max_size = static_cast<std::size_t>(-1);
+        std::size_t new_capacity = capacity_ + capacity_ / 2;
         if (size > new_capacity) {
             new_capacity = size;
         } else if (new_capacity > max_size) {
@@ -401,7 +395,7 @@ class base_memory_buffer : public channel_buffer {
         using_heap_ = true;
     }
 
-    alignas(std::max_align_t) uint8_t store_[Fixed]{};
+    alignas(std::max_align_t) std::uint8_t store_[Fixed]{};
     bool using_heap_{false};
 };
 
@@ -416,3 +410,42 @@ using buffer_4k = base_memory_buffer<4096>;
 using buffer_8k = base_memory_buffer<8192>;
 
 }  // namespace jt::detail
+
+template <std::size_t Fixed>
+class std::back_insert_iterator<jt::detail::base_memory_buffer<Fixed>> {
+  public:
+    using iterator_category = std::output_iterator_tag;
+    using value_type = void;
+    using pointer = void;
+    using reference = void;
+
+    using container_type = jt::detail::base_memory_buffer<Fixed>;
+
+#ifdef __cpp_lib_concepts
+    using difference_type = ptrdiff_t;
+#else
+    using difference_type = void;
+#endif  // __cpp_lib_concepts
+
+    explicit back_insert_iterator(container_type& buf) noexcept : container(std::addressof(buf)) {}
+
+    back_insert_iterator& operator=(const char& val) {
+        container->append(&val, 1);
+        return *this;
+    }
+
+    back_insert_iterator& operator=(char&& val) {
+        container->append(&val, 1);
+        val = 0;
+        return *this;
+    }
+
+    back_insert_iterator& operator*() noexcept { return *this; }
+
+    back_insert_iterator& operator++() noexcept { return *this; }
+
+    back_insert_iterator operator++(int) noexcept { return *this; }
+
+  protected:
+    container_type* container;
+};
