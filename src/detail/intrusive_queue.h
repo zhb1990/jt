@@ -9,6 +9,40 @@ template <auto Next>
 class intrusive_queue;
 
 template <typename Node, Node* Node::* Next>
-class intrusive_queue<Next> {};
+class intrusive_queue<Next> {
+  public:
+    intrusive_queue() noexcept = default;
+
+    intrusive_queue(intrusive_queue&& other) noexcept
+        : head_(std::exchange(other.head_, nullptr)), tail_(std::exchange(other.tail_, nullptr)) {}
+
+    intrusive_queue(Node* head, Node* tail) noexcept : head_(head), tail_(tail) {}
+
+    ~intrusive_queue() { assert(empty()); }
+
+    intrusive_queue& operator=(intrusive_queue&& other) noexcept {
+        if (this != std::addressof(other)) {
+            std::swap(head_, other.head_);
+            std::swap(tail_, other.tail_);
+        }
+
+        return *this;
+    }
+
+    [[nodiscard]] bool empty() const noexcept { return head_ == nullptr; }
+
+    Node* front() const noexcept { return head_; }
+
+    Node* back() const noexcept { return tail_; }
+
+    void clear() noexcept {
+        head_ = nullptr;
+        tail_ = nullptr;
+    }
+
+  private:
+    Node* head_{nullptr};
+    Node* tail_{nullptr};
+};
 
 }  // namespace jt::detail

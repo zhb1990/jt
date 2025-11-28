@@ -32,6 +32,7 @@ file(GLOB JT_MODULES
 
 file(GLOB JT_HEAEDERS
     "src/detail/config.h"
+    "src/detail/intrusive_queue.h"
 )
 
 file(GLOB JT_SOURCES

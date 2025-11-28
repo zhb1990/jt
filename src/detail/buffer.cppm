@@ -80,7 +80,8 @@ class channel_buffer {
   public:
     constexpr channel_buffer() = default;
 
-    constexpr channel_buffer(void* ptr, const std::size_t capacity, const std::size_t prependable = 0) : data_(ptr), capacity_(capacity) {
+    constexpr channel_buffer(void* ptr, const std::size_t capacity, const std::size_t prependable = 0)
+        : data_(ptr), capacity_(capacity) {
         if (prependable <= capacity) {
             read_ = prependable;
             write_ = prependable;
@@ -427,15 +428,15 @@ class std::back_insert_iterator<jt::detail::base_memory_buffer<Fixed>> {
     using difference_type = void;
 #endif  // __cpp_lib_concepts
 
-    explicit back_insert_iterator(container_type& buf) noexcept : container(std::addressof(buf)) {}
+    explicit back_insert_iterator(container_type& buf) noexcept : container_(std::addressof(buf)) {}
 
     back_insert_iterator& operator=(const char& val) {
-        container->append(&val, 1);
+        container_->append(&val, 1);
         return *this;
     }
 
     back_insert_iterator& operator=(char&& val) {
-        container->append(&val, 1);
+        container_->append(&val, 1);
         val = 0;
         return *this;
     }
@@ -447,5 +448,5 @@ class std::back_insert_iterator<jt::detail::base_memory_buffer<Fixed>> {
     back_insert_iterator operator++(int) noexcept { return *this; }
 
   protected:
-    container_type* container;
+    container_type* container_;
 };
