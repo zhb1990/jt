@@ -20,13 +20,37 @@ class intrusive_queue<Next> {
 
     ~intrusive_queue() { assert(empty()); }
 
-    intrusive_queue& operator=(intrusive_queue&& other) noexcept {
-        if (this != std::addressof(other)) {
-            std::swap(head_, other.head_);
-            std::swap(tail_, other.tail_);
-        }
+    auto operator=(intrusive_queue&& other) noexcept -> intrusive_queue& {
+        std::swap(head_, other.head_);
+        std::swap(tail_, other.tail_);
 
         return *this;
+    }
+
+    static auto make_reversed(Node* list) noexcept -> intrusive_queue {
+        Node* new_head = nullptr;
+        Node* new_tail = list;
+        while (list != nullptr) {
+            Node* next = list->*Next;
+            list->*Next = new_head;
+            new_head = list;
+            list = next;
+        }
+
+        return intrusive_queue(new_head, new_tail);
+    }
+
+    static auto make(Node* list) noexcept -> intrusive_queue {
+        intrusive_queue result(list, list);
+        if (list == nullptr) {
+            return result;
+        }
+
+        while (result.tail_->*Next != nullptr) {
+            result.tail_ = result.tail_->*Next;
+        }
+
+        return result;
     }
 
     [[nodiscard]] bool empty() const noexcept { return head_ == nullptr; }
