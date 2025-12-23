@@ -18,7 +18,16 @@ if(APPLE)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
+
+    find_program(CMAKE_BREW brew REQUIRED)
+    execute_process(
+        COMMAND ${CMAKE_BREW} --prefix llvm
+        OUTPUT_VARIABLE CMAKE_LLVM_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(CMAKE_CXX_COMPILER_ID_ARG1 "-resource-dir=${CMAKE_LLVM_PREFIX}/lib/c++")
 endif()
+
 
 project(jt)
 
