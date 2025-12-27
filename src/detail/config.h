@@ -10,7 +10,8 @@
 #else
 #define JT_API
 #endif
-#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER) || defined(__EMSCRIPTEN__)
+#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER) || \
+    defined(__EMSCRIPTEN__)
 #ifdef JT_LIB_VISIBILITY
 #define JT_API __attribute__((visibility("default")))
 #else

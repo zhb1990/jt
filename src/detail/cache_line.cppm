@@ -6,4 +6,4 @@ inline constexpr auto cache_line_bytes = 128;
 #else
 inline constexpr auto cache_line_bytes = 64;
 #endif
-}  // namespace jt
+}  // namespace jt::detail

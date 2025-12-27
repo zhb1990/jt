@@ -36,6 +36,7 @@ file(GLOB JT_MODULES
     "src/detail/cpu_pause.cppm"
     "src/detail/allocator.cppm"
     "src/detail/buffer.cppm"
+    "src/detail/intrusive_queue.cppm"
     "src/jt.cppm"
 )
 
