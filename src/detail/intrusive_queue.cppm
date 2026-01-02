@@ -8,6 +8,7 @@ import std;
 
 export namespace jt::detail {
 
+// https://github.com/NVIDIA/stdexec/blob/main/include/stdexec/__detail/__intrusive_queue.hpp
 template <auto Next>
 class intrusive_queue;
 

@@ -1,4 +1,4 @@
-module jt.detail.allocator;
+module jt.detail.memory;
 
 import std;
 

@@ -2,7 +2,7 @@ module;
 
 #include "config.h"
 
-export module jt.detail.allocator;
+export module jt.detail.memory;
 
 export namespace jt::detail {
 

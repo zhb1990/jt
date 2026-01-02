@@ -34,9 +34,11 @@ project(jt)
 file(GLOB JT_MODULES
     "src/detail/cache_line.cppm"
     "src/detail/cpu_pause.cppm"
-    "src/detail/allocator.cppm"
+    "src/detail/memory.cppm"
     "src/detail/buffer.cppm"
     "src/detail/intrusive_queue.cppm"
+    "src/detail/atomic_intrusive_queue.cppm"
+    "src/detail/intrusive_mpsc_queue.cppm"
     "src/jt.cppm"
 )
 
@@ -46,7 +48,7 @@ file(GLOB JT_HEAEDERS
 )
 
 file(GLOB JT_SOURCES
-    "src/detail/allocator.cpp"
+    "src/detail/memory.cpp"
 )
 
 add_library(libjt SHARED)
@@ -55,6 +57,9 @@ target_sources(libjt
     PRIVATE ${JT_HEAEDERS} ${JT_SOURCES}
     PUBLIC FILE_SET CXX_MODULES FILES ${JT_MODULES}
 )
+if(WIN32)
+    target_compile_definitions(libjt PRIVATE JT_DLL_EXPORT)
+endif()
 
 add_executable(main "src/main.cpp")
 add_dependencies(main libjt)

@@ -4,7 +4,7 @@ module;
 
 export module jt.detail.buffer;
 
-import jt.detail.allocator;
+import jt.detail.memory;
 import std;
 
 export namespace jt::detail {
@@ -87,6 +87,31 @@ class read_buffer {
   std::size_t read_{0};
 };
 
+/**
+ * 读写缓冲区
+ *
+ * 修改自 org.jboss.netty.buffer.ChannelBuffer
+ * @code
+ * +-------------------+------------------+------------------+
+ * | PrependAble bytes |  Readable bytes  |  Writable bytes  |
+ * |                   |     (CONTENT)    |                  |
+ * +-------------------+------------------+------------------+
+ * |                   |                  |                  |
+ * 0         <=      read_        <=   write_    <=     capacity_
+ *
+ * @endcode
+ * 缓冲区被划分为三个部分：
+ *
+ * - PrependAble Bytes（前置可写区域）:
+ *   起始位置：0 到
+ * read_。这部分空间可以用来在现有内容之前插入少量数据（例如协议头）。
+ *
+ * - Readable Bytes（可读区域，CONTENT）:
+ *   起始位置：read_ 到 write_。这是缓冲区的核心部分，存储当前可以读取的数据。
+ *
+ * - Writable Bytes（可写区域）:
+ *   起始位置：write_ 到 capacity_。这部分空间用于写入新数据。
+ */
 class channel_buffer {
  public:
   constexpr channel_buffer() = default;
