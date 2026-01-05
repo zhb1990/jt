@@ -112,7 +112,7 @@ class read_buffer {
  * - Writable Bytes（可写区域）:
  *   起始位置：write_ 到 capacity_。这部分空间用于写入新数据。
  */
-class channel_buffer {
+class JT_API channel_buffer {
  public:
   constexpr channel_buffer() = default;
 
@@ -415,7 +415,7 @@ class base_memory_buffer : public channel_buffer {
   }
 
   inline void append(std::string_view strv) {
-    return base_memory_buffer::append(strv.data(), strv.size());
+    return append(strv.data(), strv.size());
   }
 
   inline void append(const read_buffer& buf) {
@@ -423,7 +423,7 @@ class base_memory_buffer : public channel_buffer {
   }
 
   inline void append(const char* str) {
-    return base_memory_buffer::append(str, std::strlen(str));
+    return append(str, std::strlen(str));
   }
 
   using channel_buffer::begin;
