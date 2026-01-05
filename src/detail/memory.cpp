@@ -1,7 +1,3 @@
-module;
-
-#include "config.h"
-
 module jt.detail.memory;
 
 namespace jt::detail {
@@ -24,7 +20,7 @@ std::atomic_int64_t* get_thread_allocated_memory() {
 
 }  // namespace
 
-JT_API auto allocate(std::size_t size) -> void* {
+auto allocate(std::size_t size) -> void* {
   auto* allocated = get_thread_allocated_memory();
   size += sizeof(void*);
   allocated->fetch_add(size, std::memory_order::relaxed);
@@ -33,7 +29,7 @@ JT_API auto allocate(std::size_t size) -> void* {
   return static_cast<void*>(static_cast<char*>(ptr) + sizeof(void*));
 }
 
-JT_API void deallocate(void* ptr, std::size_t size) {
+void deallocate(void* ptr, std::size_t size) {
   size += sizeof(void*);
   ptr = static_cast<void*>(static_cast<char*>(ptr) - sizeof(void*));
   auto* allocated =
@@ -42,7 +38,7 @@ JT_API void deallocate(void* ptr, std::size_t size) {
   return std::free(ptr);
 }
 
-JT_API auto allocated_memory() -> std::map<std::thread::id, std::int64_t> {
+auto allocated_memory() -> std::map<std::thread::id, std::int64_t> {
   std::unique_lock lock(allocated_memory_mutex);
   std::map<std::thread::id, std::int64_t> result;
   for (auto& [id, allocated] : allocated_memory_map) {
