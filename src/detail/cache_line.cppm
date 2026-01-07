@@ -1,4 +1,4 @@
-export module jt.detail.cache_line;
+export module jt:detail.cache_line;
 
 export namespace jt::detail {
 #if defined(__powerpc64__) || defined(_ARCH_PPC64) || defined(__PPC64__)

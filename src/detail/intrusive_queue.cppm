@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module jt.detail.intrusive_queue;
+export module jt:detail.intrusive_queue;
 
 import std;
 

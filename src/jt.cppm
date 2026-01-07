@@ -1,7 +1,7 @@
 ﻿export module jt;
 
-export import jt.detail.buffer;
-export import jt.detail.intrusive_queue;
-export import jt.detail.atomic_intrusive_queue;
-export import jt.detail.intrusive_mpsc_queue;
-export import jt.detail.memory;
+export import :detail.buffer;
+export import :detail.intrusive_queue;
+export import :detail.atomic_intrusive_queue;
+export import :detail.intrusive_mpsc_queue;
+export import :detail.memory;

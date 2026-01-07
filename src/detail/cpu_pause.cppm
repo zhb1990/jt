@@ -7,7 +7,7 @@ module;
 #endif
 #endif
 
-export module jt.detail.cpu_pause;
+export module jt:detail.cpu_pause;
 
 export namespace jt::detail {
 

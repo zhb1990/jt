@@ -2,11 +2,11 @@ module;
 
 #include <cassert>
 
-export module jt.detail.atomic_intrusive_queue;
+export module jt:detail.atomic_intrusive_queue;
 
 import std;
-import jt.detail.cache_line;
-import jt.detail.intrusive_queue;
+import :detail.cache_line;
+import :detail.intrusive_queue;
 
 export namespace jt::detail {
 

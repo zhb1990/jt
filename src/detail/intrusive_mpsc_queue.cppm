@@ -2,11 +2,11 @@ module;
 
 #include <cassert>
 
-export module jt.detail.intrusive_mpsc_queue;
+export module jt:detail.intrusive_mpsc_queue;
 
 import std;
-import jt.detail.intrusive_queue;
-import jt.detail.cpu_pause;
+import :detail.intrusive_queue;
+import :detail.cpu_pause;
 
 export namespace jt::detail {
 

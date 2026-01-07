@@ -2,9 +2,9 @@ module;
 
 #include "config.h"
 
-export module jt.detail.buffer;
+export module jt:detail.buffer;
 
-import jt.detail.memory;
+import :detail.memory;
 import std;
 
 export namespace jt::detail {
@@ -13,7 +13,7 @@ class read_buffer {
  public:
   constexpr read_buffer() = default;
 
-  constexpr read_buffer(const void* ptr, std::size_t capacity)
+  constexpr read_buffer(const void* ptr, const std::size_t capacity)
       : ptr_(ptr), capacity_(capacity) {}
 
   constexpr explicit read_buffer(const std::string_view& strv)
@@ -61,14 +61,14 @@ class read_buffer {
     return capacity_ - read_;
   }
 
-  inline auto read(void* dest, std::size_t size) -> std::size_t {
+  auto read(void* dest, std::size_t size) -> std::size_t {
     size = (std::min)(readable(), size);
     std::memcpy(dest, begin(), size);
     read_ += size;
     return size;
   }
 
-  constexpr auto operator+=(std::size_t bytes) noexcept -> read_buffer& {
+  constexpr auto operator+=(const std::size_t bytes) noexcept -> read_buffer& {
     read_ = (std::min)(read_ + bytes, capacity_);
     return *this;
   }
@@ -163,17 +163,20 @@ class JT_API channel_buffer {
     return static_cast<const std::uint8_t*>(data_) + write_;
   }
 
-  [[nodiscard]] constexpr auto begin() -> std::uint8_t* {
-    return static_cast<std::uint8_t*>(data_) + write_;
+  template <typename Self>
+  [[nodiscard]] constexpr auto begin(this Self&& self) {
+    return static_cast<std::uint8_t*>(self.data_) + self.write_;
   }
 
-  [[nodiscard]] constexpr auto end() -> std::uint8_t* {
-    return static_cast<std::uint8_t*>(data_) + capacity_;
+  template <typename Self>
+  [[nodiscard]] constexpr auto end(this Self&& self) {
+    return static_cast<std::uint8_t*>(self.data_) + self.capacity_;
   }
 
-  [[nodiscard]] constexpr auto data() -> void* { return data_; }
-
-  [[nodiscard]] constexpr auto data() const -> const void* { return data_; }
+  template <typename Self>
+  [[nodiscard]] constexpr auto data(this Self&& self) {
+    return self.data_;
+  }
 
   [[nodiscard]] constexpr auto readable() const -> std::size_t {
     return write_ - read_;
@@ -220,21 +223,21 @@ class JT_API channel_buffer {
     write_ = prependable;
   }
 
-  inline void append(const void* buf, std::size_t len) {
+  void append(const void* buf, std::size_t len) {
     len = (std::min)(len, writable());
     std::memmove(begin(), buf, len);
     written(len);
   }
 
-  inline void append(const read_buffer& buf) {
+  void append(const read_buffer& buf) {
     return append(buf.begin(), buf.readable());
   }
 
-  inline void append(std::string_view strv) {
+  void append(const std::string_view strv) {
     return append(strv.data(), strv.size());
   }
 
-  inline void append(const char* str) { return append(str, std::strlen(str)); }
+  void append(const char* str) { return append(str, std::strlen(str)); }
 
   [[nodiscard]] auto peek(void* buf, std::size_t sz) const noexcept
       -> std::size_t {
@@ -250,7 +253,7 @@ class JT_API channel_buffer {
     return sz;
   }
 
-  auto prepend(const void* buf, std::size_t len) noexcept -> bool {
+  auto prepend(const void* buf, const std::size_t len) noexcept -> bool {
     if (prependable() < len) return false;
 
     std::memmove(static_cast<std::uint8_t*>(data_) + read_ - len, buf, len);
@@ -258,12 +261,12 @@ class JT_API channel_buffer {
     return true;
   }
 
-  constexpr void written(std::size_t sz) noexcept {
-    write_ += (std::min)(sz, writable());
+  constexpr void written(const std::size_t len) noexcept {
+    write_ += (std::min)(len, writable());
   }
 
-  constexpr void read(std::size_t sz) noexcept {
-    read_ += (std::min)(sz, readable());
+  constexpr void read(const std::size_t len) noexcept {
+    read_ += (std::min)(len, readable());
   }
 
   constexpr void read_until(const std::uint8_t* end) noexcept {
@@ -284,7 +287,9 @@ class base_memory_buffer : public channel_buffer {
  public:
   static_assert(Fixed > 0, "Fixed must > 0");
 
-  explicit base_memory_buffer(std::size_t prependable = 0)
+  using value_type = std::uint8_t;
+
+  explicit base_memory_buffer(const std::size_t prependable = 0)
       : channel_buffer(store_, Fixed, prependable), using_heap_(false) {}
 
   base_memory_buffer(const base_memory_buffer& other) : base_memory_buffer(0) {
@@ -328,7 +333,9 @@ class base_memory_buffer : public channel_buffer {
 
   explicit base_memory_buffer(const read_buffer& buf) { append(buf); }
 
-  base_memory_buffer(const void* ptr, std::size_t len) { append(ptr, len); }
+  base_memory_buffer(const void* ptr, const std::size_t len) {
+    append(ptr, len);
+  }
 
   ~base_memory_buffer() noexcept {
     if (using_heap_) {
@@ -336,7 +343,7 @@ class base_memory_buffer : public channel_buffer {
     }
   }
 
-  void reserve(std::size_t size) {
+  void reserve(const std::size_t size) {
     if (size > capacity_) {
       grow(size);
     }
@@ -353,14 +360,14 @@ class base_memory_buffer : public channel_buffer {
     clear();
   }
 
-  void make_sure_writable(std::size_t len) {
+  void make_sure_writable(const std::size_t len) {
     if (const auto sz = writable(); sz < len) {
       grow(capacity_ + len - sz);
     }
   }
 
   auto operator=(const base_memory_buffer& other) -> base_memory_buffer& {
-    if (this != std::addressof(other)) {
+    if (this != &other) {
       reserve(other.capacity_);
       read_ = other.read_;
       write_ = other.write_;
@@ -409,22 +416,22 @@ class base_memory_buffer : public channel_buffer {
     return *this;
   }
 
-  inline void append(const void* buf, std::size_t len) {
+  void append(const void* buf, const std::size_t len) {
     make_sure_writable(len);
     return channel_buffer::append(buf, len);
   }
 
-  inline void append(std::string_view strv) {
+  void append(const std::string_view strv) {
     return append(strv.data(), strv.size());
   }
 
-  inline void append(const read_buffer& buf) {
+  void append(const read_buffer& buf) {
     return append(buf.begin(), buf.readable());
   }
 
-  inline void append(const char* str) {
-    return append(str, std::strlen(str));
-  }
+  void append(const char* str) { return append(str, std::strlen(str)); }
+
+  void push_back(const std::uint8_t val) { return append(&val, sizeof(val)); }
 
   using channel_buffer::begin;
   using channel_buffer::begin_read;
@@ -447,8 +454,8 @@ class base_memory_buffer : public channel_buffer {
   using channel_buffer::written;
 
  private:
-  void grow(std::size_t size) {
-    constexpr std::size_t max_size = static_cast<std::size_t>(-1);
+  void grow(const std::size_t size) {
+    constexpr auto max_size = static_cast<std::size_t>(-1);
     std::size_t new_capacity = capacity_ + capacity_ / 2;
     if (size > new_capacity) {
       new_capacity = size;
@@ -474,54 +481,9 @@ class base_memory_buffer : public channel_buffer {
   bool using_heap_{false};
 };
 
-template class JT_API base_memory_buffer<1024>;
-template class JT_API base_memory_buffer<2048>;
-template class JT_API base_memory_buffer<4096>;
-template class JT_API base_memory_buffer<8192>;
-
 using buffer_1k = base_memory_buffer<1024>;
 using buffer_2k = base_memory_buffer<2048>;
 using buffer_4k = base_memory_buffer<4096>;
 using buffer_8k = base_memory_buffer<8192>;
 
 }  // namespace jt::detail
-
-template <std::size_t Fixed>
-class std::back_insert_iterator<jt::detail::base_memory_buffer<Fixed>> {
- public:
-  using iterator_category = std::output_iterator_tag;
-  using value_type = void;
-  using pointer = void;
-  using reference = void;
-
-  using container_type = jt::detail::base_memory_buffer<Fixed>;
-
-#ifdef __cpp_lib_concepts
-  using difference_type = ptrdiff_t;
-#else
-  using difference_type = void;
-#endif  // __cpp_lib_concepts
-
-  explicit back_insert_iterator(container_type& buf) noexcept
-      : container_(std::addressof(buf)) {}
-
-  auto operator=(const char& val) -> back_insert_iterator& {
-    container_->append(&val, 1);
-    return *this;
-  }
-
-  auto operator=(char&& val) -> back_insert_iterator& {
-    container_->append(&val, 1);
-    val = 0;
-    return *this;
-  }
-
-  auto operator*() noexcept -> back_insert_iterator& { return *this; }
-
-  auto operator++() noexcept -> back_insert_iterator& { return *this; }
-
-  auto operator++(int) noexcept -> back_insert_iterator { return *this; }
-
- protected:
-  container_type* container_;
-};
