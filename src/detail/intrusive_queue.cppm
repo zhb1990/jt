@@ -149,9 +149,9 @@ class intrusive_queue<Next> {
     }
 
     auto operator++(int) noexcept -> iterator {
-      iterator __result = *this;
+      iterator result = *this;
       ++*this;
-      return __result;
+      return result;
     }
 
     friend auto operator==(const iterator&, const iterator&) noexcept

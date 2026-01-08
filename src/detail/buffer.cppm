@@ -1,11 +1,7 @@
-module;
-
-#include "config.h"
-
 export module jt:detail.buffer;
 
-import :detail.memory;
 import std;
+import :detail.memory;
 
 export namespace jt::detail {
 
@@ -61,7 +57,7 @@ class read_buffer {
     return capacity_ - read_;
   }
 
-  auto read(void* dest, std::size_t size) -> std::size_t {
+  auto read(void* dest, std::size_t size) -> std::size_t {  // NOLINT
     size = (std::min)(readable(), size);
     std::memcpy(dest, begin(), size);
     read_ += size;
@@ -112,8 +108,10 @@ class read_buffer {
  * - Writable Bytes（可写区域）:
  *   起始位置：write_ 到 capacity_。这部分空间用于写入新数据。
  */
-class JT_API channel_buffer {
+class channel_buffer {
  public:
+  using value_type = std::uint8_t;
+
   constexpr channel_buffer() = default;
 
   constexpr channel_buffer(void* ptr, const std::size_t capacity,
@@ -194,7 +192,8 @@ class JT_API channel_buffer {
     return read_;
   }
 
-  void shrink() noexcept {
+  inline void
+  shrink() noexcept {  // NOLINT(*-convert-member-functions-to-static)
     if (read_ == 0) return;
 
     const auto size = readable();
@@ -223,7 +222,7 @@ class JT_API channel_buffer {
     write_ = prependable;
   }
 
-  void append(const void* buf, std::size_t len) {
+  inline void append(const void* buf, std::size_t len) {
     len = (std::min)(len, writable());
     std::memmove(begin(), buf, len);
     written(len);
@@ -239,21 +238,23 @@ class JT_API channel_buffer {
 
   void append(const char* str) { return append(str, std::strlen(str)); }
 
-  [[nodiscard]] auto peek(void* buf, std::size_t sz) const noexcept
+  void push_back(const std::uint8_t val) { return append(&val, sizeof(val)); }
+
+  [[nodiscard]] inline auto peek(void* buf, std::size_t sz) const noexcept
       -> std::size_t {
     sz = (std::min)(sz, readable());
     std::memmove(buf, begin_read(), sz);
     return sz;
   }
 
-  [[nodiscard]] auto rpeek(void* buf, std::size_t sz) const noexcept
+  [[nodiscard]] inline auto rpeek(void* buf, std::size_t sz) const noexcept
       -> std::size_t {
     sz = (std::min)(sz, readable());
     std::memmove(buf, end_read() - sz, sz);
     return sz;
   }
 
-  auto prepend(const void* buf, const std::size_t len) noexcept -> bool {
+  inline auto prepend(const void* buf, const std::size_t len) noexcept -> bool {
     if (prependable() < len) return false;
 
     std::memmove(static_cast<std::uint8_t*>(data_) + read_ - len, buf, len);
@@ -480,6 +481,11 @@ class base_memory_buffer : public channel_buffer {
   alignas(std::max_align_t) std::uint8_t store_[Fixed]{};
   bool using_heap_{false};
 };
+
+extern template class base_memory_buffer<1024>;
+extern template class base_memory_buffer<2048>;
+extern template class base_memory_buffer<4096>;
+extern template class base_memory_buffer<8192>;
 
 using buffer_1k = base_memory_buffer<1024>;
 using buffer_2k = base_memory_buffer<2048>;

@@ -1,7 +1,7 @@
 export module jt:detail.metric_value;
 
-import :detail.cache_line;
 import std;
+import :detail.cache_line;
 
 export namespace jt::detail {
 

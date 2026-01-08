@@ -7,6 +7,10 @@ struct test_node {
 };
 
 int main(int argc, char** argv) {
+  jt::detail::base_memory_buffer<1> b1;
+  b1.shrink();
+  std::println("readable {}", b1.readable());
+
   {
     jt::detail::base_memory_buffer<1> buffer;
     buffer.append("hello");
@@ -16,9 +20,19 @@ int main(int argc, char** argv) {
     std::string_view strv1(buffer);
     std::println("{}", strv1);
     std::println("mem {}", jt::detail::allocated_memory());
+    const jt::detail::read_buffer rb(buffer);
+    std::println("{}", std::string_view(rb));
+  }
+  std::println("mem {}", jt::detail::allocated_memory());
+
+  {
+    void* ptr = jt::detail::allocate(100);
+    std::println("mem {}", jt::detail::allocated_memory());
+    std::println("ptr size {}", jt::detail::allocated_size(ptr));
+    jt::detail::deallocate(ptr, 100);
+    std::println("mem {}", jt::detail::allocated_memory());
   }
 
-  std::println("mem {}", jt::detail::allocated_memory());
   test_node n1{.value = 1};
   test_node n2{.value = 2};
   jt::detail::intrusive_queue<&test_node::next> queue;
