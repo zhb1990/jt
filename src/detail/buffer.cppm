@@ -1,3 +1,7 @@
+module;
+
+#include "config.h"
+
 export module jt:detail.buffer;
 
 import std;
@@ -192,15 +196,7 @@ class channel_buffer {
     return read_;
   }
 
-  inline void
-  shrink() noexcept {  // NOLINT(*-convert-member-functions-to-static)
-    if (read_ == 0) return;
-
-    const auto size = readable();
-    std::memmove(data_, begin_read(), size);
-    read_ = 0;
-    write_ = size;
-  }
+  JT_API void shrink() noexcept;
 
   constexpr explicit operator read_buffer() const noexcept {
     const auto size = readable();
@@ -222,45 +218,23 @@ class channel_buffer {
     write_ = prependable;
   }
 
-  inline void append(const void* buf, std::size_t len) {
-    len = (std::min)(len, writable());
-    std::memmove(begin(), buf, len);
-    written(len);
-  }
+  JT_API void append(const void* buf, std::size_t len);
 
-  void append(const read_buffer& buf) {
-    return append(buf.begin(), buf.readable());
-  }
+  JT_API void append(const read_buffer& buf);
 
-  void append(const std::string_view strv) {
-    return append(strv.data(), strv.size());
-  }
+  JT_API void append(std::string_view strv);
 
-  void append(const char* str) { return append(str, std::strlen(str)); }
+  JT_API void append(const char* str);
 
-  void push_back(const std::uint8_t val) { return append(&val, sizeof(val)); }
+  JT_API void push_back(std::uint8_t val);
 
-  [[nodiscard]] inline auto peek(void* buf, std::size_t sz) const noexcept
-      -> std::size_t {
-    sz = (std::min)(sz, readable());
-    std::memmove(buf, begin_read(), sz);
-    return sz;
-  }
+  [[nodiscard]] JT_API auto peek(void* buf, std::size_t sz) const noexcept
+      -> std::size_t;
 
-  [[nodiscard]] inline auto rpeek(void* buf, std::size_t sz) const noexcept
-      -> std::size_t {
-    sz = (std::min)(sz, readable());
-    std::memmove(buf, end_read() - sz, sz);
-    return sz;
-  }
+  [[nodiscard]] JT_API auto rpeek(void* buf, std::size_t sz) const noexcept
+      -> std::size_t;
 
-  inline auto prepend(const void* buf, const std::size_t len) noexcept -> bool {
-    if (prependable() < len) return false;
-
-    std::memmove(static_cast<std::uint8_t*>(data_) + read_ - len, buf, len);
-    read_ -= len;
-    return true;
-  }
+  JT_API auto prepend(const void* buf, std::size_t len) noexcept -> bool;
 
   constexpr void written(const std::size_t len) noexcept {
     write_ += (std::min)(len, writable());
@@ -270,7 +244,7 @@ class channel_buffer {
     read_ += (std::min)(len, readable());
   }
 
-  constexpr void read_until(const std::uint8_t* end) noexcept {
+  constexpr void read_until(const std::uint8_t* end) noexcept {  // NOLINT
     if (end > begin_read() && end <= end_read()) {
       read_ += end - begin_read();
     }
@@ -339,6 +313,7 @@ class base_memory_buffer : public channel_buffer {
   }
 
   ~base_memory_buffer() noexcept {
+    // ReSharper disable once CppDFAConstantConditions
     if (using_heap_) {
       deallocate(data_, capacity_);
     }
