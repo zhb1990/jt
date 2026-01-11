@@ -7,8 +7,8 @@ export module jt:log.sink;
 import std;
 import :detail.buffer;
 import :detail.memory;
-import :log.formatter;
 import :log.level;
+import :log.fwd;
 
 export namespace jt::log {
 

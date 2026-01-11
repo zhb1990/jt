@@ -3,10 +3,9 @@ export module jt:log.message;
 import std;
 import :detail.buffer;
 import :log.level;
+import :log.fwd;
 
 export namespace jt::log {
-
-class logger;
 
 enum message_type : std::uint8_t { log, flush };
 

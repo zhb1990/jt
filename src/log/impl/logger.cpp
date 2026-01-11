@@ -4,6 +4,7 @@ module jt;
 import std;
 import :detail.string;
 import :detail.vector;
+import :log.message;
 
 namespace jt::log {
 
@@ -26,19 +27,27 @@ class logger_impl {
 
   auto get_name() const noexcept -> std::string_view { return name_; }
 
-  void flush() const {}
+  auto is_async() const noexcept -> bool { return async_; }
 
-  auto should_log(level lv) const noexcept -> bool {
-    return static_cast<std::uint8_t>(lv) <=
-           static_cast<std::uint8_t>(get_level());
+  auto get_service() const noexcept -> service& { return service_; }
+
+  void backend_log(const message& msg) const {
+    for (const auto& sink : sinks_) {
+      try {
+        sink->log(msg);
+      } catch (...) {
+      }
+    }
   }
 
-  void log(level lv, detail::buffer_1k& buf,
-           const std::source_location& source) const {}
-
-  void backend_log(const message& msg) const {}
-
-  void backend_flush() const {}
+  void backend_flush() const {
+    for (const auto& sink : sinks_) {
+      try {
+        sink->flush();
+      } catch (...) {
+      }
+    }
+  }
 
  private:
   service& service_;
@@ -61,21 +70,39 @@ auto logger::get_name() const noexcept -> std::string_view {
   return impl_->get_name();
 }
 
-void logger::flush() const { return impl_->flush(); }
+void logger::flush() {
+  if (!impl_->is_async()) {
+    return impl_->backend_flush();
+  }
+
+  return impl_->get_service().flush(weak_from_this());
+}
 
 auto logger::should_log(level lv) const noexcept -> bool {
-  return impl_->should_log(lv);
+  return static_cast<std::uint8_t>(lv) <=
+         static_cast<std::uint8_t>(impl_->get_level());
 }
 
-void logger::log(level lv, detail::buffer_1k& buf,
-                 const std::source_location& source) const {
-  return impl_->log(lv, buf, source);
+void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,
+                 const std::source_location& source) {
+  auto& service = impl_->get_service();
+  if (!impl_->is_async()) {
+    message msg;
+    msg.buf = std::move(buf);
+    msg.source = source;
+    msg.lv = lv;
+    msg.sid = sid;
+    msg.point = std ::chrono::system_clock::now();
+    msg.type = message_type::log;
+    msg.tid = 0;  // todo: os::tid();
+    return impl_->backend_log(msg);
+  }
+
+  return service.log(weak_from_this(), sid, lv, buf, source);
 }
 
-void logger::backend_log(const message& msg) const {
-  return impl_->backend_log(msg);
-}
+void logger::backend_log(const message& msg) { return impl_->backend_log(msg); }
 
-void logger::backend_flush() const { return impl_->backend_flush(); }
+void logger::backend_flush() { return impl_->backend_flush(); }
 
 }  // namespace jt::log

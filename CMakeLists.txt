@@ -48,6 +48,7 @@ set(JT_MODULES
         "src/detail/vector.cppm"
 
         "src/log/level.cppm"
+        "src/log/fwd.cppm"
         "src/log/logger.cppm"
         "src/log/message.cppm"
         "src/log/service.cppm"
