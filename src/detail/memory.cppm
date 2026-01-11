@@ -47,7 +47,9 @@ class allocator {
     return static_cast<T*>(ptr);
   }
 
-  void deallocate(T* const ptr, const std::size_t) { detail::deallocate(ptr); }
+  void deallocate(T* const ptr, const std::size_t) {
+    detail::deallocate(ptr, 0);
+  }
 
   [[nodiscard]] auto allocate(const std::size_t count, const void*) -> T* {
     return this->allocate(count);
@@ -72,14 +74,14 @@ class allocator {
 };
 
 template <class T, class Other>
-[[nodiscard]] bool operator==(const allocator<T>&,
-                              const allocator<Other>&) noexcept {
+[[nodiscard]] auto operator==(const allocator<T>&,
+                              const allocator<Other>&) noexcept -> bool {
   return true;
 }
 
 template <class T, class Other>
-[[nodiscard]] bool operator!=(const allocator<T>&,
-                              const allocator<Other>&) noexcept {
+[[nodiscard]] auto operator!=(const allocator<T>&,
+                              const allocator<Other>&) noexcept -> bool {
   return false;
 }
 
@@ -101,6 +103,28 @@ template <typename T, typename... Types>
 auto make_unique(Types&&... args) -> unique_ptr<T> {
   auto* ptr = ::new (allocate(sizeof(T))) T(std::forward<Types>(args)...);
   return unique_ptr<T>(ptr, deleter<T>());
+}
+
+template <typename Base>
+struct dynamic_deleter {
+  void* raw_ptr{nullptr};
+
+  void operator()(Base* ptr) const noexcept {
+    static_assert(sizeof(*ptr), "can't delete an incomplete type");
+    ptr->~Base();
+    return detail::deallocate(raw_ptr, 0);
+  }
+};
+
+template <typename Base>
+using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
+
+template <typename Base, typename Derived, typename... Types>
+  requires(std::is_base_of_v<Base, Derived>)
+auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
+  auto* ptr = ::new (detail::allocate(sizeof(Derived)))
+      Derived(std::forward<Types>(args)...);
+  return dynamic_unique_ptr<Base>{dynamic_cast<Base*>(ptr), {ptr}};
 }
 
 }  // namespace jt::detail
