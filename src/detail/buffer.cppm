@@ -112,7 +112,7 @@ class read_buffer {
  * - Writable Bytes（可写区域）:
  *   起始位置：write_ 到 capacity_。这部分空间用于写入新数据。
  */
-class channel_buffer {
+class JT_API channel_buffer {
  public:
   using value_type = std::uint8_t;
 
@@ -196,7 +196,7 @@ class channel_buffer {
     return read_;
   }
 
-  JT_API void shrink() noexcept;
+  void shrink() noexcept;
 
   constexpr explicit operator read_buffer() const noexcept {
     const auto size = readable();
@@ -218,23 +218,23 @@ class channel_buffer {
     write_ = prependable;
   }
 
-  JT_API void append(const void* buf, std::size_t len);
+  void append(const void* buf, std::size_t len);
 
-  JT_API void append(const read_buffer& buf);
+  void append(const read_buffer& buf);
 
-  JT_API void append(std::string_view strv);
+  void append(std::string_view strv);
 
-  JT_API void append(const char* str);
+  void append(const char* str);
 
-  JT_API void push_back(std::uint8_t val);
+  void push_back(std::uint8_t val);
 
-  [[nodiscard]] JT_API auto peek(void* buf, std::size_t sz) const noexcept
+  [[nodiscard]] auto peek(void* buf, std::size_t sz) const noexcept
       -> std::size_t;
 
-  [[nodiscard]] JT_API auto rpeek(void* buf, std::size_t sz) const noexcept
+  [[nodiscard]] auto rpeek(void* buf, std::size_t sz) const noexcept
       -> std::size_t;
 
-  JT_API auto prepend(const void* buf, std::size_t len) noexcept -> bool;
+  auto prepend(const void* buf, std::size_t len) noexcept -> bool;
 
   constexpr void written(const std::size_t len) noexcept {
     write_ += (std::min)(len, writable());

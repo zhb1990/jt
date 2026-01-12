@@ -14,21 +14,21 @@ export namespace jt::log {
 
 class sink_impl;
 
-class sink {
+class JT_API sink {
  public:
   using time_point = std::chrono::system_clock::time_point;
 
-  JT_API sink();
+  sink();
 
-  JT_API virtual ~sink() noexcept;
+  virtual ~sink() noexcept;
 
-  JT_API void set_level(level lv);
+  void set_level(level lv);
 
-  JT_API void log(const message& msg);
+  void log(const message& msg);
 
-  JT_API void flush();
+  void flush();
 
-  JT_API void set_formatter(formatter_ptr ptr);
+  void set_formatter(formatter_ptr ptr);
 
   virtual void write(const time_point& point, const detail::buffer_1k& buf,
                      std::size_t& color_start, std::size_t& color_stop) = 0;

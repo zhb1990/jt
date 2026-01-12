@@ -10,26 +10,30 @@ namespace jt::log {
 
 class logger_impl {
  public:
-  logger_impl(service& service, const std::string_view& name,
-              detail::vector<sink_ptr>& sinks, bool async)
+  logger_impl(service& service, const std::string_view& name,  // NOLINT
+              detail::vector<sink_ptr>& sinks, const bool async)
       : service_(service),
         name_(name),
         sinks_(std::move(sinks)),
         async_(async) {}
 
-  void set_level(level lv) noexcept {
+  void set_level(const level lv) noexcept {
     lv_.store(lv, std::memory_order::relaxed);
   }
 
-  auto get_level() const noexcept -> level {
+  [[nodiscard]] auto get_level() const noexcept -> level {
     return lv_.load(std::memory_order::relaxed);
   }
 
-  auto get_name() const noexcept -> std::string_view { return name_; }
+  [[nodiscard]] auto get_name() const noexcept -> std::string_view {
+    return name_;
+  }
 
-  auto is_async() const noexcept -> bool { return async_; }
+  [[nodiscard]] auto is_async() const noexcept -> bool { return async_; }
 
-  auto get_service() const noexcept -> service& { return service_; }
+  [[nodiscard]] auto get_service() const noexcept -> service& {
+    return service_;
+  }
 
   void backend_log(const message& msg) const {
     for (const auto& sink : sinks_) {
@@ -57,12 +61,13 @@ class logger_impl {
   bool async_;
 };
 
-logger::logger(service& service, const std::string_view& name,
+logger::logger(service& service, const std::string_view& name,  // NOLINT
                detail::vector<sink_ptr> sinks, bool async)
     : impl_(detail::make_unique<logger_impl>(service, name, sinks, async)) {}
 logger::~logger() noexcept = default;
 
-void logger::set_level(level lv) noexcept { return impl_->set_level(lv); }
+// ReSharper disable once CppMemberFunctionMayBeConst
+void logger::set_level(const level lv) noexcept { return impl_->set_level(lv); }
 
 auto logger::get_level() const noexcept -> level { return impl_->get_level(); }
 
@@ -70,7 +75,7 @@ auto logger::get_name() const noexcept -> std::string_view {
   return impl_->get_name();
 }
 
-void logger::flush() {
+void logger::flush() {  // NOLINT(*-convert-member-functions-to-static)
   if (!impl_->is_async()) {
     return impl_->backend_flush();
   }
@@ -83,7 +88,7 @@ auto logger::should_log(level lv) const noexcept -> bool {
          static_cast<std::uint8_t>(impl_->get_level());
 }
 
-void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,
+void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,  // NOLINT
                  const std::source_location& source) {
   auto& service = impl_->get_service();
   if (!impl_->is_async()) {
@@ -101,8 +106,10 @@ void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,
   return service.log(weak_from_this(), sid, lv, buf, source);
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void logger::backend_log(const message& msg) { return impl_->backend_log(msg); }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void logger::backend_flush() { return impl_->backend_flush(); }
 
 }  // namespace jt::log

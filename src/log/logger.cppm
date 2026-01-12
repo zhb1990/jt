@@ -23,17 +23,18 @@ export class logger : public std::enable_shared_from_this<logger> {
 
   JT_API void set_level(level lv) noexcept;
 
-  JT_API auto get_level() const noexcept -> level;
+  [[nodiscard]] JT_API auto get_level() const noexcept -> level;
 
-  JT_API auto get_name() const noexcept -> std::string_view;
+  [[nodiscard]] JT_API auto get_name() const noexcept -> std::string_view;
 
   JT_API void flush();
 
-  JT_API auto should_log(level lv) const noexcept -> bool;
+  [[nodiscard]] JT_API auto should_log(level lv) const noexcept -> bool;
 
   template <typename... Args>
-  void log(level lv, const std::format_string<Args...>& fmt, Args&&... args,
-           std::source_location source = std::source_location::current()) {
+  void log(
+      const level lv, const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(lv)) return;
 
     try {
@@ -46,8 +47,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void critical(const std::format_string<Args...>& fmt, Args&&... args,
-                std::source_location source = std::source_location::current()) {
+  void critical(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::critical)) return;
 
     try {
@@ -60,8 +62,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void error(const std::format_string<Args...>& fmt, Args&&... args,
-             std::source_location source = std::source_location::current()) {
+  void error(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::error)) return;
 
     try {
@@ -74,8 +77,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void warn(const std::format_string<Args...>& fmt, Args&&... args,
-            std::source_location source = std::source_location::current()) {
+  void warn(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::warn)) return;
 
     try {
@@ -88,8 +92,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void info(const std::format_string<Args...>& fmt, Args&&... args,
-            std::source_location source = std::source_location::current()) {
+  void info(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::info)) return;
 
     try {
@@ -102,8 +107,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void debug(const std::format_string<Args...>& fmt, Args&&... args,
-             std::source_location source = std::source_location::current()) {
+  void debug(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::debug)) return;
 
     try {
@@ -116,8 +122,9 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
   template <typename... Args>
-  void trace(const std::format_string<Args...>& fmt, Args&&... args,
-             std::source_location source = std::source_location::current()) {
+  void trace(
+      const std::format_string<Args...>& fmt, Args&&... args,
+      const std::source_location source = std::source_location::current()) {
     if (!should_log(level::trace)) return;
 
     try {
