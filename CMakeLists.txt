@@ -44,6 +44,7 @@ set(JT_MODULES
         "src/detail/atomic_intrusive_queue.cppm"
         "src/detail/intrusive_mpsc_queue.cppm"
         "src/detail/metric_value.cppm"
+        "src/detail/os.cppm"
         "src/detail/string.cppm"
         "src/detail/vector.cppm"
 
@@ -63,6 +64,7 @@ set(JT_HEADERS "src/detail/config.h")
 set(JT_SOURCES
         "src/detail/impl/buffer.cpp"
         "src/detail/impl/memory.cpp"
+        "src/detail/impl/os.cpp"
 
         "src/log/impl/logger.cpp"
         "src/log/impl/service.cpp"

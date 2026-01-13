@@ -315,6 +315,7 @@ class base_memory_buffer : public channel_buffer {
   ~base_memory_buffer() noexcept {
     // ReSharper disable once CppDFAConstantConditions
     if (using_heap_) {
+      // ReSharper disable once CppDFAUnreachableCode
       deallocate(data_, capacity_);
     }
   }

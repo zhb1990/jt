@@ -99,7 +99,7 @@ void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,  // NOLINT
     msg.sid = sid;
     msg.point = std ::chrono::system_clock::now();
     msg.type = message_type::log;
-    msg.tid = 0;  // todo: os::tid();
+    msg.tid = detail::tid();
     return impl_->backend_log(msg);
   }
 

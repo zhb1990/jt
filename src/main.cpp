@@ -33,15 +33,5 @@ int main(int argc, char** argv) {
     std::println("mem {}", jt::detail::allocated_memory());
   }
 
-  test_node n1{.value = 1};
-  test_node n2{.value = 2};
-  jt::detail::intrusive_queue<&test_node::next> queue;
-  queue.push_back(&n1);
-  queue.push_back(&n2);
-  for (auto* i : queue) {
-    std::println("node {}", i->value);
-  }
-  queue.clear();
-
   return 0;
 }
