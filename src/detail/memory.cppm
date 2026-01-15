@@ -8,15 +8,15 @@ export module jt:detail.memory;
 
 import std;
 
-namespace jt::detail {
+export namespace jt::detail {
 
-export JT_API auto allocate(std::size_t size) -> void*;
+JT_API auto allocate(std::size_t size) -> void*;
 
-export JT_API auto allocated_size(void* ptr) -> std::size_t;
+JT_API auto allocated_size(void* ptr) -> std::size_t;
 
-export JT_API void deallocate(void* ptr, std::size_t size);
+JT_API void deallocate(void* ptr, std::size_t size);
 
-export JT_API auto allocated_memory() -> std::int64_t;
+JT_API auto allocated_memory() -> std::int64_t;
 
 template <typename T>
 class allocator {
@@ -110,7 +110,6 @@ struct dynamic_deleter {
   void* raw_ptr{nullptr};
 
   void operator()(Base* ptr) const noexcept {
-    static_assert(sizeof(*ptr), "can't delete an incomplete type");
     ptr->~Base();
     return detail::deallocate(raw_ptr, 0);
   }

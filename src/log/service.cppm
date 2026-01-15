@@ -8,8 +8,9 @@ import std;
 import :detail.memory;
 import :detail.buffer;
 import :detail.vector;
-import :log.fwd;
 import :log.level;
+import :log.sink;
+import :log.fwd;
 
 export namespace jt::log {
 
@@ -17,6 +18,10 @@ class service_impl;
 
 class JT_API service {
  public:
+  using logger_sptr = std::shared_ptr<logger>;
+  using logger_wptr = std::weak_ptr<logger>;
+  using sink_ptr = detail::dynamic_unique_ptr<sink>;
+
   service();
 
   ~service() noexcept;
@@ -33,11 +38,11 @@ class JT_API service {
 
   auto get_default() -> logger_sptr;
 
-  void set_default(logger_sptr ptr);
+  void set_default(const logger_sptr& ptr);
 
-  void flush(logger_wptr ptr);
+  void flush(const logger_wptr& ptr);
 
-  void log(logger_wptr ptr, std::uint32_t sid, level lv, detail::buffer_1k& buf,
+  void log(const logger_wptr& ptr, std::uint32_t sid, level lv, detail::buffer_1k& buf,
            const std::source_location& source);
 
   template <std::ranges::input_range R>

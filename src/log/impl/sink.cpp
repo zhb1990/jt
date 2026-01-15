@@ -10,7 +10,7 @@ namespace jt::log {
 
 class sink_impl {
  public:
-  sink_impl() { // NOLINT
+  sink_impl() {  // NOLINT
     formatter_ = detail::make_dynamic_unique<formatter, default_formatter>();
   }
 
@@ -34,7 +34,7 @@ class sink_impl {
     return s->flush_unlock();
   }
 
-  void set_formatter(formatter_ptr ptr) {
+  void set_formatter(sink::formatter_ptr ptr) {
     std::lock_guard lock(mtx_);
     formatter_ = std::move(ptr);
   }
@@ -43,7 +43,7 @@ class sink_impl {
   std::atomic<level> lv_{level::trace};
   char padding[detail::cache_line_bytes - sizeof(std::atomic<level>)];
 
-  formatter_ptr formatter_;
+  sink::formatter_ptr formatter_;
   std::mutex mtx_;
 };
 

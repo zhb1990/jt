@@ -17,6 +17,7 @@ class sink_impl;
 class JT_API sink {
  public:
   using time_point = std::chrono::system_clock::time_point;
+  using formatter_ptr = detail::dynamic_unique_ptr<formatter>;
 
   sink();
 

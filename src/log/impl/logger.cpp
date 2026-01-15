@@ -11,7 +11,7 @@ namespace jt::log {
 class logger_impl {
  public:
   logger_impl(service& service, const std::string_view& name,  // NOLINT
-              detail::vector<sink_ptr>& sinks, const bool async)
+              detail::vector<service::sink_ptr>& sinks, const bool async)
       : service_(service),
         name_(name),
         sinks_(std::move(sinks)),
@@ -56,7 +56,7 @@ class logger_impl {
  private:
   service& service_;
   detail::string name_;
-  detail::vector<sink_ptr> sinks_;
+  detail::vector<service::sink_ptr> sinks_;
   std::atomic<level> lv_{level::trace};
   bool async_;
 };

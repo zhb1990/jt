@@ -2,15 +2,20 @@
 module jt;
 
 import std;
-import :log.fwd;
 import :log.message;
 import :detail.intrusive_mpsc_queue;
 import :detail.string;
+import :detail.vector;
+import :detail.deque;
+import :detail.unordered_map;
 
 namespace jt::log {
 
 class service_impl {
  public:
+  using logger_sptr = std::shared_ptr<logger>;
+  using logger_wptr = std::weak_ptr<logger>;
+
   void register_logger(logger_sptr& ptr) {  // NOLINT
     detail::string name;
     name = ptr->get_name();
@@ -56,37 +61,48 @@ class service_impl {
   }
 
   void clear() {  // NOLINT(*-convert-member-functions-to-static)
-    set_default({});
     {
       std::scoped_lock lock{loggers_mutex_};
       loggers_.clear();
     }
+    set_default({});
   }
 
   void start() {}
 
   void stop() {}
 
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  auto get_default() -> logger_sptr {
+  auto get_default() -> logger_sptr {  // NOLINT
+#if defined(__clang__)
+    std::scoped_lock lock{loggers_mutex_};
+    return default_logger_;
+#else
     return default_logger_.load(std::memory_order::relaxed);
+#endif
   }
 
-  void set_default(logger_sptr ptr) {  // NOLINT
-    const auto old = default_logger_.load(std::memory_order::relaxed);
-    erase(old->get_name());
-    return default_logger_.store(std::move(ptr), std::memory_order::relaxed);
+  void set_default(const logger_sptr& ptr) {  // NOLINT
+#if defined(__clang__)
+    std::scoped_lock lock{loggers_mutex_};
+    default_logger_ = ptr;
+#else
+    default_logger_.store(ptr, std::memory_order::relaxed);
+#endif
   }
 
-  void flush(logger_wptr ptr) {}
+  void flush(const logger_wptr& ptr) {}
 
-  void log(logger_wptr ptr, std::uint32_t sid, level lv, detail::buffer_1k& buf,
-           const std::source_location& source) {}
+  void log(const logger_wptr& ptr, std::uint32_t sid, level lv,
+           detail::buffer_1k& buf, const std::source_location& source) {}
 
  private:
   std::mutex loggers_mutex_{};
-  std::unordered_map<detail::string, logger_sptr> loggers_{};
+  detail::unordered_map<detail::string, logger_sptr> loggers_{};
+#if defined(__clang__)
+  logger_sptr default_logger_{};
+#else
   std::atomic<logger_sptr> default_logger_{};
+#endif
 
   std::thread writer_thread_{};
   std::mutex writer_mutex_{};
@@ -94,7 +110,7 @@ class service_impl {
   detail::intrusive_mpsc_queue<&message::next> writer_queue_{};
 
   std::thread lz4_thread_{};
-  std::deque<std::string> lz4_queue_{};
+  detail::deque<detail::string> lz4_queue_{};
   std::mutex lz4_mutex_{};
   std::condition_variable_any lz4_cv_{};
 
@@ -129,16 +145,17 @@ void service::stop() { return impl_->stop(); }
 auto service::get_default() -> logger_sptr { return impl_->get_default(); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-void service::set_default(logger_sptr ptr) {
-  return impl_->set_default(std::move(ptr));
+void service::set_default(const logger_sptr& ptr) {
+  return impl_->set_default(ptr);
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-void service::flush(logger_wptr ptr) { return impl_->flush(std::move(ptr)); }
+void service::flush(const logger_wptr& ptr) { return impl_->flush(ptr); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-void service::log(logger_wptr ptr, const std::uint32_t sid, const level lv,
-                  detail::buffer_1k& buf, const std::source_location& source) {
+void service::log(const logger_wptr& ptr, const std::uint32_t sid,
+                  const level lv, detail::buffer_1k& buf,
+                  const std::source_location& source) {
   return impl_->log(std::move(ptr), sid, lv, buf, source);
 }
 
