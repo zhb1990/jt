@@ -39,6 +39,4 @@ class JT_API sink {
   detail::unique_ptr<sink_impl> impl_;
 };
 
-using sink_ptr = detail::dynamic_unique_ptr<sink>;
-
 }  // namespace jt::log

@@ -17,7 +17,8 @@ class logger_impl;
 
 export class logger : public std::enable_shared_from_this<logger> {
  public:
-  friend class service;
+  logger(service& service, const std::string_view& name,
+         detail::vector<sink_ptr> sinks, bool async);
 
   JT_API ~logger() noexcept;
 
@@ -137,9 +138,6 @@ export class logger : public std::enable_shared_from_this<logger> {
   }
 
  protected:
-  logger(service& service, const std::string_view& name,
-         detail::vector<sink_ptr> sinks, bool async);
-
   JT_API void log(std::uint32_t sid, level lv, detail::buffer_1k& buf,
                   const std::source_location& source);
 
