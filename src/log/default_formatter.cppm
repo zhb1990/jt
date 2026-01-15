@@ -26,7 +26,7 @@ class default_formatter : public formatter {
       last_second_ = current_second;
       date_and_time_.clear();
       std::format_to(std::back_inserter(date_and_time_), "{:%Y-%m-%d %H:%M:%S}",
-                     msg.point);
+                     std::chrono::floor<std::chrono::seconds>(msg.point));
     }
 
     const auto millis = time_fraction<milliseconds>(msg.point);
