@@ -6,6 +6,6 @@ import :detail.memory;
 export namespace jt::detail {
 
 template <typename T>
-using vector = std::vector<T, detail::allocator<T>>;
+using vector = std::vector<T, allocator<T>>;
 
 }  // namespace jt::detail
