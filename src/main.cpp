@@ -9,8 +9,8 @@ struct test_node {
 int main(int argc, char** argv) {
   std::println("mem {}", jt::detail::allocated_memory());
   {
-    std::array a1{jt::detail::make_dynamic_unique<jt::log::sink,
-                                                  jt::log::sink_console>()};
+    std::array a1{
+        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
     jt::log::service service;
     service.start();
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
       jt::log::info(log1, "mem {}", jt::detail::allocated_memory());
     }
 
+    jt::log::warn(log1, "{} {}", reinterpret_cast<const char*>(u8"使用的内存"), jt::detail::allocated_memory());
     service.stop();
     std::println("mem {}", jt::detail::allocated_memory());
   }

@@ -15,7 +15,7 @@ ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
   return duration_cast<ToDuration>(duration) - duration_cast<ToDuration>(secs);
 }
 
-class default_formatter : public formatter {
+class default_formatter final : public formatter {
  public:
   void format(const message& msg, detail::buffer_1k& buf,  // NOLINT
               std::size_t& color_start, std::size_t& color_stop) override {
