@@ -6,6 +6,7 @@ struct message;
 class sink;
 class logger;
 class service;
+class service_impl;
 struct formatter;
 
 }  // namespace jt::log

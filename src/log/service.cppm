@@ -14,8 +14,6 @@ import :log.fwd;
 
 export namespace jt::log {
 
-class service_impl;
-
 class JT_API service {
  public:
   using logger_sptr = std::shared_ptr<logger>;

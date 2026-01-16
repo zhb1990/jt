@@ -24,10 +24,10 @@ auto allocated_size(void* ptr) -> std::size_t {
 }
 
 void deallocate(void* ptr, const std::size_t size) {
-  const std::size_t real = size + sizeof(std::size_t);
-  memory_total.fetch_sub(real);
   ptr = static_cast<void*>(static_cast<char*>(ptr) - sizeof(std::size_t));
-  assert(size == 0 || *static_cast<std::size_t*>(ptr) == size);
+  const std::size_t real = *static_cast<std::size_t*>(ptr);
+  assert(size == 0 || real == size);
+  memory_total.fetch_sub(real + sizeof(std::size_t));
   return std::free(ptr);
 }
 

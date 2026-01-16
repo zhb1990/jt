@@ -47,6 +47,7 @@ class allocator {
     return static_cast<T*>(ptr);
   }
 
+  // ReSharper disable once CppMemberFunctionMayBeStatic
   void deallocate(T* const ptr, const std::size_t) {
     detail::deallocate(ptr, 0);
   }

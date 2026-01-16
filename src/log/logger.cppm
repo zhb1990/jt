@@ -17,6 +17,7 @@ class logger_impl;
 
 class logger : public std::enable_shared_from_this<logger> {
  public:
+  friend class service_impl;
   using sink_ptr = detail::dynamic_unique_ptr<sink>;
   logger(service& service, const std::string_view& name,
          detail::vector<sink_ptr> sinks, bool async);
