@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstddef>
-
 #if !defined(__clang__) && (defined(_WIN32) || defined(__CYGWIN__))
 #if defined(JT_DLL_EXPORT)
 #define JT_API __declspec(dllexport)

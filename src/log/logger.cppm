@@ -186,4 +186,212 @@ struct trace {
 template <typename... Args>
 trace(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
       Args&&... args) -> trace<Args...>;
+
+template <typename... Args>
+struct vcritical {
+  vcritical(
+      const std::shared_ptr<logger>& logger, const std::string_view fmt,
+      Args&&... args,
+      const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::critical)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, level::critical, buf, source);
+    } catch (...) {
+    }
+  }
+
+  vcritical(
+      const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
+      Args&&... args,
+      const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::critical)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, level::critical, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+vcritical(const std::shared_ptr<logger>& logger, std::string_view fmt,
+          Args&&... args) -> vcritical<Args...>;
+
+template <typename... Args>
+vcritical(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
+          Args&&... args) -> vcritical<Args...>;
+
+template <typename... Args>
+struct verror {
+  verror(const std::shared_ptr<logger>& logger, const std::string_view fmt,
+         Args&&... args,
+         const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::error)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, level::error, buf, source);
+    } catch (...) {
+    }
+  }
+
+  verror(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
+         Args&&... args,
+         const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::error)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, level::error, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+verror(const std::shared_ptr<logger>& logger, std::string_view fmt,
+       Args&&... args) -> verror<Args...>;
+
+template <typename... Args>
+verror(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
+       Args&&... args) -> verror<Args...>;
+
+template <typename... Args>
+struct vwarn {
+  vwarn(const std::shared_ptr<logger>& logger, const std::string_view fmt,
+        Args&&... args,
+        const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::warn)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, level::warn, buf, source);
+    } catch (...) {
+    }
+  }
+
+  vwarn(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
+        Args&&... args,
+        const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::warn)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, level::warn, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+vwarn(const std::shared_ptr<logger>& logger, std::string_view fmt,
+      Args&&... args) -> vwarn<Args...>;
+
+template <typename... Args>
+vwarn(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
+      Args&&... args) -> vwarn<Args...>;
+
+template <typename... Args>
+struct vinfo {
+  vinfo(const std::shared_ptr<logger>& logger, const std::string_view fmt,
+        Args&&... args,
+        const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::info)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, level::info, buf, source);
+    } catch (...) {
+    }
+  }
+
+  vinfo(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
+        Args&&... args,
+        const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::info)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, level::info, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+vinfo(const std::shared_ptr<logger>& logger, std::string_view fmt,
+      Args&&... args) -> vinfo<Args...>;
+
+template <typename... Args>
+vinfo(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
+      Args&&... args) -> vinfo<Args...>;
+
+template <typename... Args>
+struct vtrace {
+  vtrace(const std::shared_ptr<logger>& logger, const std::string_view fmt,
+         Args&&... args,
+         const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::trace)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, level::trace, buf, source);
+    } catch (...) {
+    }
+  }
+
+  vtrace(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
+         Args&&... args,
+         const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(level::trace)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, level::trace, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+vtrace(const std::shared_ptr<logger>& logger, std::string_view fmt,
+       Args&&... args) -> vtrace<Args...>;
+
+template <typename... Args>
+vtrace(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
+       Args&&... args) -> vtrace<Args...>;
+
 }  // namespace jt::log
