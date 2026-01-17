@@ -17,6 +17,14 @@ namespace jt::log {
 
 #ifndef _WIN32
 
+constexpr std::string_view color_reset = "\033[m";
+constexpr std::string_view color_white = "\033[37m";
+constexpr std::string_view color_green = "\033[32m";
+constexpr std::string_view color_cyan = "\033[36m";
+constexpr std::string_view color_yellow_bold = "\033[33m\033[1m";
+constexpr std::string_view color_red_bold = "\033[31m\033[1m";
+constexpr std::string_view color_bold_on_red = "\033[1m\033[41m";
+
 // Determine if the terminal supports colors
 // Based on: https://github.com/agauniyal/rang/
 bool is_color_terminal() noexcept {
@@ -63,10 +71,19 @@ class sink_console_impl {
   }
 #endif
 
-  void write(const sink::time_point& point, const detail::buffer_1k& buf,
-             std::size_t& color_start, std::size_t& color_stop) {
+  void write(const level lv, const sink::time_point&,
+             const detail::buffer_1k& buf, const std::size_t color_start,
+             const std::size_t color_stop) {
     std::lock_guard lock(mutex_);
-    write_range(buf, 0, buf.readable());
+    if (enable_color_ && color_stop > color_start) {
+      write_range(buf, 0, color_start);
+      set_color(lv);
+      write_range(buf, color_start, color_stop);
+      reset_color();
+      write_range(buf, color_stop, buf.readable());
+    } else {
+      write_range(buf, 0, buf.readable());
+    }
   }
 
   void flush_unlock() {
@@ -92,13 +109,91 @@ class sink_console_impl {
     WriteConsoleW(handle_, temp.c_str(), static_cast<DWORD>(temp.size()),
                   &written, nullptr);
 #else
-    fwrite(buf.begin_read() + start, sizeof(char), end - start, handle_);
+    std::fwrite(buf.begin_read() + start, sizeof(char), end - start, handle_);
+#endif
+  }
+
+  void set_color(const level lv) {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO orig_buffer_info;
+    if (!::GetConsoleScreenBufferInfo(handle_, &orig_buffer_info)) {
+      return;
+    }
+
+    if (old_attribs_ == 0) {
+      old_attribs_ = orig_buffer_info.wAttributes;
+    }
+
+    WORD new_attribs = 0;
+    switch (lv) {
+      case level::critical:
+        new_attribs = BACKGROUND_RED | FOREGROUND_RED | FOREGROUND_GREEN |
+                      FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        break;
+      case level::error:
+        new_attribs = FOREGROUND_RED | FOREGROUND_INTENSITY;
+        break;
+      case level::warn:
+        new_attribs = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+        break;
+      case level::info:
+        new_attribs = FOREGROUND_GREEN;
+        break;
+      case level::debug:
+        new_attribs = FOREGROUND_GREEN | FOREGROUND_BLUE;
+        break;
+      default:
+        new_attribs = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+        break;
+    }
+
+    ::SetConsoleTextAttribute(
+        handle_, new_attribs | (orig_buffer_info.wAttributes & 0xfff0));
+#else
+    switch (lv) {
+      case level::critical:
+        std::fwrite(color_bold_on_red.data(), sizeof(char),
+                    color_bold_on_red.size(), handle_);
+        return;
+      case level::error:
+        std::fwrite(color_red_bold.data(), sizeof(char), color_red_bold.size(),
+                    handle_);
+        return;
+      case level::warn:
+        std::fwrite(color_yellow_bold.data(), sizeof(char),
+                    color_yellow_bold.size(), handle_);
+        return;
+      case level::info:
+        std::fwrite(color_cyan.data(), sizeof(char), color_cyan.size(),
+                    handle_);
+        return;
+      case level::debug:
+        std::fwrite(color_green.data(), sizeof(char), color_green.size(),
+                    handle_);
+        return;
+      default:
+        std::fwrite(color_white.data(), sizeof(char), color_white.size(),
+                    handle_);
+        return;
+    }
+#endif
+  }
+
+  void reset_color() {
+#ifdef _WIN32
+    if (old_attribs_ > 0) {
+      ::SetConsoleTextAttribute(handle_, old_attribs_);
+      old_attribs_ = 0;
+    }
+#else
+    std::fwrite(color_reset.data(), sizeof(char), color_reset.size(), handle_);
 #endif
   }
 
   static std::mutex mutex_;
 #ifdef _WIN32
   HANDLE handle_{INVALID_HANDLE_VALUE};
+  WORD old_attribs_{0};
 #else
   std::FILE* handle_{nullptr};
 #endif
@@ -119,9 +214,11 @@ sink_stdout::sink_stdout() : impl_(console_stdout) {}
 
 sink_stdout::~sink_stdout() noexcept = default;
 
-void sink_stdout::write(const time_point& point, const detail::buffer_1k& buf,
-                        std::size_t& color_start, std::size_t& color_stop) {
-  return impl_.write(point, buf, color_start, color_stop);
+void sink_stdout::write(const level lv, const time_point& point,
+                        const detail::buffer_1k& buf,
+                        const std::size_t color_start,
+                        const std::size_t color_stop) {
+  return impl_.write(lv, point, buf, color_start, color_stop);
 }
 
 void sink_stdout::flush_unlock() { return impl_.flush_unlock(); }
@@ -130,9 +227,11 @@ sink_stderr::sink_stderr() : impl_(console_stderr) {}
 
 sink_stderr::~sink_stderr() noexcept = default;
 
-void sink_stderr::write(const time_point& point, const detail::buffer_1k& buf,
-                        std::size_t& color_start, std::size_t& color_stop) {
-  return impl_.write(point, buf, color_start, color_stop);
+void sink_stderr::write(const level lv, const time_point& point,
+                        const detail::buffer_1k& buf,
+                        const std::size_t color_start,
+                        const std::size_t color_stop) {
+  return impl_.write(lv, point, buf, color_start, color_stop);
 }
 
 void sink_stderr::flush_unlock() { return impl_.flush_unlock(); }

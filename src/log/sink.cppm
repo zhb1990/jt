@@ -31,8 +31,9 @@ class JT_API sink {
 
   void set_formatter(formatter_ptr ptr);
 
-  virtual void write(const time_point& point, const detail::buffer_1k& buf,
-                     std::size_t& color_start, std::size_t& color_stop) = 0;
+  virtual void write(level lv, const time_point& point,
+                     const detail::buffer_1k& buf, std::size_t color_start,
+                     std::size_t color_stop) = 0;
 
   virtual void flush_unlock() = 0;
 

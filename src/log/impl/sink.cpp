@@ -26,7 +26,7 @@ class sink_impl {
     std::size_t color_start, color_stop;
     std::lock_guard lock(mtx_);
     formatter_->format(msg, buf, color_start, color_stop);
-    return s->write(msg.point, buf, color_start, color_stop);
+    return s->write(msg.lv, msg.point, buf, color_start, color_stop);
   }
 
   void flush(sink* s) {  // NOLINT(*-convert-member-functions-to-static)
