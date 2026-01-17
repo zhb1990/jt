@@ -28,10 +28,10 @@ bool is_color_terminal() noexcept {
       return true;
     }
 
-    static constexpr std::array terms = {
-        {"ansi", "color", "console", "cygwin", "gnome", "konsole", "kterm",
-         "linux", "msys", "putty", "rxvt", "screen", "vt100", "xterm",
-         "alacritty", "vt102"}};
+    constexpr std::array terms{"ansi",  "color",   "console",   "cygwin",
+                               "gnome", "konsole", "kterm",     "linux",
+                               "msys",  "putty",   "rxvt",      "screen",
+                               "vt100", "xterm",   "alacritty", "vt102"};
     const char* env_term_p = std::getenv("TERM");
     if (env_term_p == nullptr) {
       return false;
@@ -47,7 +47,7 @@ bool is_color_terminal() noexcept {
 
 // Determine if the terminal attached
 // Source: https://github.com/agauniyal/rang/
-bool in_terminal(std::FILE* file) { return ::isatty(std::fileno(file)) != 0; }
+bool in_terminal(std::FILE* file) { return ::isatty(::fileno(file)) != 0; }
 
 #endif
 
@@ -94,7 +94,7 @@ class sink_console_impl {
     WriteConsoleW(handle_, temp.c_str(), static_cast<DWORD>(temp.size()),
                   &written, nullptr);
 #else
-    fwrite(buf.begin_read() + start, sizeof(char), end - start, file_);
+    fwrite(buf.begin_read() + start, sizeof(char), end - start, handle_);
 #endif
   }
 
