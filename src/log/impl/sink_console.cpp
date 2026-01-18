@@ -71,9 +71,8 @@ class sink_console_impl {
   }
 #endif
 
-  void write(const level lv, const sink::time_point&,
-             const detail::buffer_1k& buf, const std::size_t color_start,
-             const std::size_t color_stop) {
+  void write(const level lv, const detail::buffer_1k& buf,
+             const std::size_t color_start, const std::size_t color_stop) {
     std::lock_guard lock(mutex_);
     if (enable_color_ && color_stop > color_start) {
       write_range(buf, 0, color_start);
@@ -214,11 +213,11 @@ sink_stdout::sink_stdout() : impl_(console_stdout) {}
 
 sink_stdout::~sink_stdout() noexcept = default;
 
-void sink_stdout::write(const level lv, const time_point& point,
+void sink_stdout::write(const level lv, const time_point&,
                         const detail::buffer_1k& buf,
                         const std::size_t color_start,
                         const std::size_t color_stop) {
-  return impl_.write(lv, point, buf, color_start, color_stop);
+  return impl_.write(lv, buf, color_start, color_stop);
 }
 
 void sink_stdout::flush_unlock() { return impl_.flush_unlock(); }
@@ -227,11 +226,11 @@ sink_stderr::sink_stderr() : impl_(console_stderr) {}
 
 sink_stderr::~sink_stderr() noexcept = default;
 
-void sink_stderr::write(const level lv, const time_point& point,
+void sink_stderr::write(const level lv, const time_point&,
                         const detail::buffer_1k& buf,
                         const std::size_t color_start,
                         const std::size_t color_stop) {
-  return impl_.write(lv, point, buf, color_start, color_stop);
+  return impl_.write(lv, buf, color_start, color_stop);
 }
 
 void sink_stderr::flush_unlock() { return impl_.flush_unlock(); }

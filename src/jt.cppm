@@ -14,3 +14,4 @@ export import :log.level;
 export import :log.logger;
 export import :log.service;
 export import :log.sink.console;
+export import :log.sink.file;
