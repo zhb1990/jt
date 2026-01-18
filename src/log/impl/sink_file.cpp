@@ -1,4 +1,5 @@
 // module jt:log.sink.file;
+#include <iterator>
 module jt;
 
 import std;
@@ -19,19 +20,9 @@ class sink_file_imp {
 
   void write(const sink::time_point& point, const detail::buffer_1k& buf) {
     if (tomorrow_ < point) {
-      auto temp = std::chrono::floor<std::chrono::days>(point);
-      tomorrow_ = temp + std::chrono::days(1);
+      tomorrow_ =
+          std::chrono::floor<std::chrono::days>(point) + std::chrono::days(1);
       if (daily_rotation_ || manifest_.day == 0) {
-        std::chrono::year_month_day today{temp};
-        std::int32_t day = int{today.year()} * 10000 +
-                           unsigned{today.month()} * 100 +
-                           unsigned{today.day()};
-        if (manifest_.day < day) {
-            manifest_.day = day;
-            manifest_.seq = 0;
-            save_manifest();
-        }
-
         rotate();
       }
     }
@@ -65,6 +56,27 @@ class sink_file_imp {
       file_.close();
       file_size_ = 0;
       // todo: lz4 file_name_
+    }
+
+    std::chrono::year_month_day today{tomorrow_ - std::chrono::days{1}};
+    std::int32_t day = int{today.year()} * 10000 +
+                       unsigned{today.month()} * 100 + unsigned{today.day()};
+    if (manifest_.day < day) {
+      manifest_.day = day;
+      manifest_.seq = 0;
+      save_manifest();
+    } else {
+      ++manifest_.seq;
+      save_manifest();
+    }
+
+    detail::buffer_1k temp;
+    if (manifest_.seq == 0) {
+      std::format_to(std::back_inserter(temp), "{}_{}.log", name_,
+                     manifest_.day);
+    } else {
+      std::format_to(std::back_inserter(temp), "{}_{}_{:04d}.log", name_,
+                     manifest_.day, manifest_.seq);
     }
   }
 
