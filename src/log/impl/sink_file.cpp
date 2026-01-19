@@ -1,5 +1,8 @@
+module;
+
+#include <simdjson.h>
+
 // module jt:log.sink.file;
-#include <iterator>
 module jt;
 
 import std;
@@ -8,14 +11,27 @@ namespace jt::log {
 
 class sink_file_imp {
  public:
-  sink_file_imp(const sink_file_config& config)
+  explicit sink_file_imp(const sink_file_config& config)  // NOLINT
       : max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
     name_ = config.name;
     directory_ = config.directory;
     lz4_directory_ = config.lz4_directory;
+
+    detail::buffer_1k temp;
+    std::format_to(std::back_inserter(temp), "manifest_{}.json", name_);
+    temp.push_back('\0');
+
+    manifest_path_ = reinterpret_cast<const char8_t*>(directory_.c_str());
+    std::error_code ec;
+    create_directories(manifest_path_, ec);
+    manifest_path_ /= reinterpret_cast<const char8_t*>(temp.begin_read());
     load_manifest();
+
+    const std::filesystem::path lz4_directory =
+        reinterpret_cast<const char8_t*>(lz4_directory_.c_str());
+    create_directories(lz4_directory, ec);
   }
 
   void write(const sink::time_point& point, const detail::buffer_1k& buf) {
@@ -40,16 +56,57 @@ class sink_file_imp {
     file_size_ += buf.readable();
   }
 
-  void flush_unlock() {
+  void flush_unlock() {  // NOLINT(*-convert-member-functions-to-static)
     if (file_.is_open()) {
       file_.flush();
     }
   }
 
  private:
-  void load_manifest() {}
+  void load_manifest() {
+    std::ifstream manifest(manifest_path_, std::ios_base::binary);
+    if (!manifest.is_open()) {
+      return;
+    }
 
-  void save_manifest() {}
+    const detail::string data((std::istreambuf_iterator(manifest)),
+                              std::istreambuf_iterator<char>());
+    const simdjson::padded_string padded_data(data.c_str(), data.size());
+    simdjson::ondemand::document doc;
+    if (simdjson::ondemand::parser parser;
+        parser.iterate(padded_data).get(doc)) {
+      return;
+    }
+
+    std::uint32_t day{0};
+    if (doc["day"].get(day)) {
+      return;
+    }
+
+    std::uint32_t seq{0};
+    if (doc["seq"].get(seq)) {
+      return;
+    }
+
+    manifest_.day = day;
+    manifest_.seq = seq;
+    const int year = static_cast<int>(day / 10000);
+    const int month = static_cast<int>(day % 10000) / 100;
+    const int m_day = static_cast<int>(day % 100);
+    tomorrow_ = std::chrono::year_month_day(std::chrono::year(year),
+                                            std::chrono::month(month),
+                                            std::chrono::day(m_day));
+    tomorrow_ += std::chrono::days{1};
+  }
+
+  void save_manifest() {
+    std::ofstream file(manifest_path_, std::ios::binary);
+    detail::buffer_1k temp;
+    std::format_to(std::back_inserter(temp), R"({{ "day":{}, "seq":{} }})",
+                   manifest_.day, manifest_.seq);
+    file.write(reinterpret_cast<const char*>(temp.begin_read()),
+               static_cast<std::streamsize>(temp.readable()));
+  }
 
   void rotate() {
     if (file_.is_open()) {
@@ -58,10 +115,11 @@ class sink_file_imp {
       // todo: lz4 file_name_
     }
 
-    std::chrono::year_month_day today{tomorrow_ - std::chrono::days{1}};
-    std::int32_t day = int{today.year()} * 10000 +
-                       unsigned{today.month()} * 100 + unsigned{today.day()};
-    if (manifest_.day < day) {
+    const std::chrono::year_month_day today{tomorrow_ - std::chrono::days{1}};
+    const std::int32_t day = int{today.year()} * 10000 +
+                             unsigned{today.month()} * 100 +
+                             unsigned{today.day()};
+    if (manifest_.day < day) {  // NOLINT(*-branch-clone)
       manifest_.day = day;
       manifest_.seq = 0;
       save_manifest();
@@ -71,18 +129,26 @@ class sink_file_imp {
     }
 
     detail::buffer_1k temp;
-    if (manifest_.seq == 0) {
+    if (manifest_.seq == 0) {  // NOLINT(*-branch-clone)
       std::format_to(std::back_inserter(temp), "{}_{}.log", name_,
                      manifest_.day);
     } else {
       std::format_to(std::back_inserter(temp), "{}_{}_{:04d}.log", name_,
                      manifest_.day, manifest_.seq);
     }
+    temp.push_back('\0');
+
+    file_name_ = reinterpret_cast<const char8_t*>(directory_.c_str());
+    file_name_ /= reinterpret_cast<const char8_t*>(temp.begin_read());
+    if (std::filesystem::exists(file_name_)) {
+      file_size_ = std::filesystem::file_size(file_name_);
+    }
+    file_.open(file_name_, std::ios::binary | std::ios::app);
   }
 
-  detail::string name_;
-  detail::string directory_;
-  detail::string lz4_directory_;
+  detail::string name_{};
+  detail::string directory_{};
+  detail::string lz4_directory_{};
   std::size_t max_size_;
   bool daily_rotation_;
   std::uint32_t keep_days_;
@@ -94,13 +160,14 @@ class sink_file_imp {
     std::uint32_t seq{0};
   };
   manifest manifest_{};
+  std::filesystem::path manifest_path_;
   std::ofstream file_;
-  detail::string file_name_;
+  std::filesystem::path file_name_;
   std::size_t file_size_{0};
   std::chrono::sys_days tomorrow_{};
 };
 
-sink_file::sink_file(const sink_file_config& config)
+sink_file::sink_file(const sink_file_config& config)  // NOLINT
     : impl_(detail::make_unique<sink_file_imp>(config)) {}
 
 sink_file::~sink_file() noexcept = default;

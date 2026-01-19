@@ -11,7 +11,7 @@ import :detail.string;
 
 export namespace jt::log {
 
-struct sink_file_config {
+struct sink_file_config { // NOLINT(*-pro-type-member-init)
   // 日志文件的基础名字
   std::string_view name;
   // 日志文件的目录
@@ -30,7 +30,7 @@ class sink_file_imp;
 
 class JT_API sink_file : public sink {
  public:
-  sink_file(const sink_file_config& config);
+  explicit sink_file(const sink_file_config& config);
 
   ~sink_file() noexcept override;
 

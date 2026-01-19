@@ -9,8 +9,16 @@ struct test_node {
 int main(int argc, char** argv) {
   std::println("mem {}", jt::detail::allocated_memory());
   {
+    jt::log::sink_file_config config;
+    config.daily_rotation = true;
+    config.directory = "./";
+    config.keep_days = 2;
+    config.lz4_directory = "./lz4";
+    config.max_size = 1024;
+    config.name = "test";
     std::array a1{
-        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
+        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
+            config)};
     jt::log::service service;
     service.start();
     std::this_thread::sleep_for(std::chrono::seconds(1));

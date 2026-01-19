@@ -35,6 +35,21 @@ endif ()
 
 project(jt)
 
+find_package(lz4 CONFIG REQUIRED)
+if (NOT lz4_FOUND)
+    message(WARNING "lz4 not found.")
+endif ()
+
+find_package(asio CONFIG REQUIRED)
+if (NOT asio_FOUND)
+    message(WARNING "asio not found.")
+endif ()
+
+find_package(simdjson CONFIG REQUIRED)
+if (NOT simdjson_FOUND)
+    message(WARNING "simdjson not found.")
+endif ()
+
 set(JT_MODULES
         "src/jt.cppm"
 
@@ -81,6 +96,7 @@ set(JT_SOURCES
 )
 
 add_library(libjt SHARED)
+target_link_libraries(libjt PRIVATE simdjson::simdjson)
 set_target_properties(libjt PROPERTIES PREFIX "")
 if (APPLE)
     target_link_directories(libjt PUBLIC ${CMAKE_LLVM_PREFIX}/lib/c++)
