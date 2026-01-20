@@ -54,10 +54,98 @@ struct lz4_data {
 
   ~lz4_data() noexcept { LZ4F_freeCompressionContext(ctx); }
 
-  void compress(const std::string& src, const std::string& dest);
+  void compress(const detail::string& src, const detail::string& directory) {
+    auto stamp = std::chrono::high_resolution_clock::now();
+    // 转成utf-8指针
+    std::ifstream input;
+    std::filesystem::path path_src =
+        reinterpret_cast<const char8_t*>(src.c_str());
+    input.open(path_src, std::ios_base::binary);
+    if (!input.is_open()) {
+      print_stderr("compress open input {} fail\n", src);
+      return;
+    }
+
+    // 转成utf-8指针
+    std::ofstream output;
+    std::filesystem::path path_dest =
+        reinterpret_cast<const char8_t*>(directory.c_str());
+    path_dest /= path_src.filename();
+    path_dest.replace_extension(".log.lz4");
+    output.open(path_dest, std::ios_base::binary | std::ios_base::trunc);
+    if (!output.is_open()) {
+      print_stderr("compress open output {} fail\n", src);
+      return;
+    }
+
+    std::uint64_t count_out = 0;
+    std::uint64_t count_in = 0;
+    if (compress_file(output, count_out, count_in, input)) {
+      if (count_in > 0) {
+        auto cost = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::high_resolution_clock::now() - stamp)
+                        .count();
+        auto rate =
+            static_cast<double>(count_out) / static_cast<double>(count_in);
+        print_stderr("{}: compress {} -> {} bytes, {:.2}, {}ms\n", src,
+                     count_in, count_out, rate, cost);
+      }
+      input.close();
+      std::error_code ec;
+      std::filesystem::remove(path_src, ec);
+      if (ec) {
+        print_stderr("after compress remove fail, {}\n",
+                     detail::system_category().message(ec.value()));
+      }
+    }
+  }
 
   bool compress_file(std::ofstream& output, std::uint64_t& count_out,
-                     std::uint64_t& count_in, std::ifstream& input);
+                     std::uint64_t& count_in, std::ifstream& input) {
+    /* write frame header */
+    auto const header_size = LZ4F_compressBegin(
+        ctx, output_buff.data(), output_buff.size(), &lz4_preferences);
+    if (LZ4F_isError(header_size)) {
+      print_stderr("Failed to start compression: error 0x{:x}\n", header_size);
+      return false;
+    }
+    output.write(output_buff.data(), static_cast<std::streamsize>(header_size));
+    count_out = header_size;
+
+    /* stream file */
+    while (!input.eof()) {
+      input.read(input_chunk.data(), lz4_input_chunk_size);
+      const auto read_size = static_cast<size_t>(input.gcount());
+      /* nothing left to read from input file */
+      if (read_size == 0) break;
+      count_in += read_size;
+
+      auto const compressed_size =
+          LZ4F_compressUpdate(ctx, output_buff.data(), output_buff.size(),
+                              input_chunk.data(), read_size, nullptr);
+      if (LZ4F_isError(compressed_size)) {
+        print_stderr("Compression failed: error 0x{:x}\n", compressed_size);
+        return false;
+      }
+      output.write(output_buff.data(),
+                   static_cast<std::streamsize>(compressed_size));
+      count_out += compressed_size;
+    }
+
+    /* flush whatever remains within internal buffers */
+    auto const compressed_size =
+        LZ4F_compressEnd(ctx, output_buff.data(), output_buff.size(), nullptr);
+    if (LZ4F_isError(compressed_size)) {
+      print_stderr("Failed to end compression: error 0x{:x}\n",
+                   compressed_size);
+      return false;
+    }
+    output.write(output_buff.data(),
+                 static_cast<std::streamsize>(compressed_size));
+    count_out += compressed_size;
+
+    return true;
+  }
 
   detail::vector<char> input_chunk;
   detail::vector<char> output_buff;
@@ -153,7 +241,7 @@ class service_impl {
     message_allocator_.construct(msg);
     msg->logger = ptr;
     msg->type = message_type::flush;
-    return push_message(msg);
+    return push_log_message(msg);
   }
 
   void log(const logger_wptr& ptr, const std::uint32_t sid, const level lv,
@@ -168,27 +256,30 @@ class service_impl {
     msg->sid = sid;
     msg->point = std::chrono::system_clock::now();
     msg->tid = detail::tid();
-    return push_message(msg);
+    return push_log_message(msg);
   }
 
   void post_lz4(const std::filesystem::path& file_name,  // NOLINT
                 const std::string_view lz4_directory) {
     const auto str = file_name.generic_u8string();
     lz4_message msg;
+    msg.tp = lz4_message::type::lz4;
     msg.lz4_directory = lz4_directory;
     msg.file_name.assign(reinterpret_cast<const char*>(str.c_str()),
                          str.size());
-    {
-      std::scoped_lock lock{lz4_mutex_};
-      if (lz4_stop_requested_) return;
-
-      lz4_queue_.emplace_back(std::move(msg));
-      lz4_cv_.notify_one();
-    }
+    return push_lz4_message(msg);
   }
 
  private:
-  void push_message(message* msg) {
+  struct lz4_message;
+  void push_lz4_message(lz4_message& msg) {
+    std::scoped_lock lock{lz4_mutex_};
+    if (lz4_stop_requested_) return;
+
+    lz4_queue_.emplace_back(std::move(msg));
+    lz4_cv_.notify_one();
+  }
+  void push_log_message(message* msg) {
     std::ptrdiff_t n =
         writer_submission_counter_.fetch_add(1, std::memory_order::relaxed);
     if (n < 0) {
@@ -265,6 +356,9 @@ class service_impl {
       }
 
       for (auto& msg : queue) {
+        if (msg.tp == lz4_message::type::lz4) {
+          lz4_data_.compress(msg.file_name, msg.lz4_directory);
+        }
       }
 
       if (stop_requested) break;
@@ -272,8 +366,11 @@ class service_impl {
   }
 
   struct lz4_message {  // NOLINT(*-pro-type-member-init)
-    detail::string file_name;
+    enum class type { lz4, clear };
+    type tp{type::lz4};
     detail::string lz4_directory;
+    detail::string file_name;
+    std::uint32_t keep_days{0};
   };
 
   std::mutex loggers_mutex_{};

@@ -20,7 +20,8 @@ int main(int argc, char** argv) {
     service.start();
     std::array a1{
         jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
-            service, config)};
+            service, config),
+        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
     std::this_thread::sleep_for(std::chrono::seconds(1));
     const auto log1 = service.create_logger(std::move(a1), "test", true);
     jt::log::info(log1, "mem {}", jt::detail::allocated_memory());
