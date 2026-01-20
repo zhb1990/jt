@@ -188,6 +188,47 @@ trace(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
       Args&&... args) -> trace<Args...>;
 
 template <typename... Args>
+struct vlog {
+  vlog(const std::shared_ptr<logger>& logger, const level lv,
+       const std::string_view fmt, Args&&... args,
+       const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(lv)) return;
+
+    try {
+      detail::buffer_1k buf;
+      std::vformat_to(std::back_inserter(buf), fmt,
+                      std::make_format_args(args...));
+      logger->log(0, lv, buf, source);
+    } catch (...) {
+    }
+  }
+
+  vlog(const std::shared_ptr<logger>& logger, const level lv,
+       const std::u8string_view fmt, Args&&... args,
+       const std::source_location& source = std::source_location::current()) {
+    if (!logger->should_log(lv)) return;
+
+    try {
+      detail::buffer_1k buf;
+      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
+                                  fmt.size());
+      std::vformat_to(std::back_inserter(buf), temp,
+                      std::make_format_args(args...));
+      logger->log(0, lv, buf, source);
+    } catch (...) {
+    }
+  }
+};
+
+template <typename... Args>
+vlog(const std::shared_ptr<logger>& logger, level lv, std::string_view fmt,
+     Args&&... args) -> vlog<Args...>;
+
+template <typename... Args>
+vlog(const std::shared_ptr<logger>& logger, level lv, std::u8string_view fmt,
+     Args&&... args) -> vlog<Args...>;
+
+template <typename... Args>
 struct vcritical {
   vcritical(
       const std::shared_ptr<logger>& logger, const std::string_view fmt,

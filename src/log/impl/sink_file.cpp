@@ -11,8 +11,9 @@ namespace jt::log {
 
 class sink_file_imp {
  public:
-  explicit sink_file_imp(const sink_file_config& config)  // NOLINT
-      : max_size_(config.max_size),
+  explicit sink_file_imp(service& s, const sink_file_config& config)  // NOLINT
+      : service_(s),
+        max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
     name_ = config.name;
@@ -116,7 +117,7 @@ class sink_file_imp {
     if (file_.is_open()) {
       file_.close();
       file_size_ = 0;
-      // todo: lz4 file_name_
+      service_.post_lz4(file_name_, lz4_directory_);
     }
 
     const std::chrono::year_month_day today{tomorrow_ - std::chrono::days{1}};
@@ -152,6 +153,7 @@ class sink_file_imp {
     file_.open(file_name_, std::ios::binary | std::ios::app);
   }
 
+  service& service_;
   detail::string name_{};
   detail::string directory_{};
   detail::string lz4_directory_{};
@@ -173,8 +175,8 @@ class sink_file_imp {
   std::chrono::sys_days tomorrow_{};
 };
 
-sink_file::sink_file(const sink_file_config& config)  // NOLINT
-    : impl_(detail::make_unique<sink_file_imp>(config)) {}
+sink_file::sink_file(service& s, const sink_file_config& config)  // NOLINT
+    : impl_(detail::make_unique<sink_file_imp>(s, config)) {}
 
 sink_file::~sink_file() noexcept = default;
 

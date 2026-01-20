@@ -16,11 +16,11 @@ int main(int argc, char** argv) {
     config.lz4_directory = "./lz4";
     config.max_size = 1024;
     config.name = "test";
-    std::array a1{
-        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
-            config)};
     jt::log::service service;
     service.start();
+    std::array a1{
+        jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
+            service, config)};
     std::this_thread::sleep_for(std::chrono::seconds(1));
     const auto log1 = service.create_logger(std::move(a1), "test", true);
     jt::log::info(log1, "mem {}", jt::detail::allocated_memory());

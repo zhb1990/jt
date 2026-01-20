@@ -30,7 +30,7 @@ class sink_file_imp;
 
 class JT_API sink_file : public sink {
  public:
-  explicit sink_file(const sink_file_config& config);
+  explicit sink_file(service& s, const sink_file_config& config);
 
   ~sink_file() noexcept override;
 

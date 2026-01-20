@@ -1,3 +1,7 @@
+module;
+
+#include <lz4frame.h>
+
 // module jt:log.service;
 module jt;
 
@@ -14,6 +18,51 @@ namespace jt::log {
 
 constexpr std::ptrdiff_t thread_closed =
     std::numeric_limits<std::ptrdiff_t>::min() / 2;
+
+static constexpr LZ4F_preferences_t lz4_preferences = {
+    {LZ4F_max256KB, LZ4F_blockLinked, LZ4F_noContentChecksum, LZ4F_frame,
+     0 /* unknown content size */, 0 /* no dictID */, LZ4F_noBlockChecksum},
+    0,         /* compression level; 0 == default */
+    0,         /* auto flush */
+    0,         /* favor decompression speed */
+    {0, 0, 0}, /* reserved, must be set to 0 */
+};
+
+constexpr size_t lz4_input_chunk_size = 16ull * 1024;
+
+class lz4_exception final : public std::exception {
+ public:
+  explicit lz4_exception(const size_t ec) : ec_(ec) {}
+  [[nodiscard]] const char* what() const noexcept override {
+    return LZ4F_getErrorName(ec_);
+  }
+
+ private:
+  size_t ec_;
+};
+
+struct lz4_data {
+  lz4_data() {  // NOLINT(*-pro-type-member-init)
+    input_chunk.resize(lz4_input_chunk_size);
+    output_buff.resize(
+        LZ4F_compressBound(lz4_input_chunk_size, &lz4_preferences));
+    if (const size_t ec = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
+        LZ4F_isError(ec)) {
+      throw lz4_exception(ec);
+    }
+  }
+
+  ~lz4_data() noexcept { LZ4F_freeCompressionContext(ctx); }
+
+  void compress(const std::string& src, const std::string& dest);
+
+  bool compress_file(std::ofstream& output, std::uint64_t& count_out,
+                     std::uint64_t& count_in, std::ifstream& input);
+
+  detail::vector<char> input_chunk;
+  detail::vector<char> output_buff;
+  LZ4F_compressionContext_t ctx{nullptr};
+};
 
 class service_impl {
  public:
@@ -57,6 +106,8 @@ class service_impl {
     if (writer_thread_.joinable() || lz4_thread_.joinable()) return;
 
     writer_thread_ = std::thread{[this]() { return writer_run(); }};
+
+    lz4_thread_ = std::thread{[this]() { return lz4_run(); }};
   }
 
   void stop() {
@@ -118,6 +169,22 @@ class service_impl {
     msg->point = std::chrono::system_clock::now();
     msg->tid = detail::tid();
     return push_message(msg);
+  }
+
+  void post_lz4(const std::filesystem::path& file_name,  // NOLINT
+                const std::string_view lz4_directory) {
+    const auto str = file_name.generic_u8string();
+    lz4_message msg;
+    msg.lz4_directory = lz4_directory;
+    msg.file_name.assign(reinterpret_cast<const char*>(str.c_str()),
+                         str.size());
+    {
+      std::scoped_lock lock{lz4_mutex_};
+      if (lz4_stop_requested_) return;
+
+      lz4_queue_.emplace_back(std::move(msg));
+      lz4_cv_.notify_one();
+    }
   }
 
  private:
@@ -184,6 +251,31 @@ class service_impl {
     }
   }
 
+  void lz4_run() {  // NOLINT(*-make-member-function-const)
+    while (true) {
+      detail::deque<lz4_message> queue;
+      bool stop_requested = false;
+      {
+        std::unique_lock lock{lz4_mutex_};
+        lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
+          return !lz4_queue_.empty() || writer_stop_requested_;
+        });
+        queue = std::move(lz4_queue_);
+        stop_requested = writer_stop_requested_;
+      }
+
+      for (auto& msg : queue) {
+      }
+
+      if (stop_requested) break;
+    }
+  }
+
+  struct lz4_message {  // NOLINT(*-pro-type-member-init)
+    detail::string file_name;
+    detail::string lz4_directory;
+  };
+
   std::mutex loggers_mutex_{};
   detail::unordered_map<std::string_view, logger_sptr> loggers_{};
 #if defined(__clang__)
@@ -198,9 +290,10 @@ class service_impl {
   detail::intrusive_mpsc_queue<&message::next> writer_queue_{};
 
   std::thread lz4_thread_{};
-  detail::deque<detail::string> lz4_queue_{};
+  detail::deque<lz4_message> lz4_queue_{};
   std::mutex lz4_mutex_{};
   std::condition_variable_any lz4_cv_{};
+  lz4_data lz4_data_;
 
   bool lz4_stop_requested_{false};
   bool writer_ready_{false};
@@ -255,6 +348,12 @@ auto service::create_logger(const std::string_view& name,  // NOLINT
                                           name, std::move(sinks), async);
   impl_->register_logger(ptr);
   return ptr;
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void service::post_lz4(const std::filesystem::path& file_name,
+                       const std::string_view lz4_directory) {
+  impl_->post_lz4(file_name, lz4_directory);
 }
 
 }  // namespace jt::log
