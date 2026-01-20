@@ -22,16 +22,21 @@ class sink_file_imp {
 
     detail::buffer_1k temp;
     std::format_to(std::back_inserter(temp), "manifest_{}.json", name_);
-    temp.push_back('\0');
 
-    manifest_path_ = reinterpret_cast<const char8_t*>(directory_.c_str());
+    std::u8string_view u8strv(
+        reinterpret_cast<const char8_t*>(directory_.c_str()),
+        directory_.size());
+    manifest_path_ = u8strv;
     std::error_code ec;
     create_directories(manifest_path_, ec);
-    manifest_path_ /= reinterpret_cast<const char8_t*>(temp.begin_read());
+    u8strv = {reinterpret_cast<const char8_t*>(temp.begin_read()),
+              temp.readable()};
+    manifest_path_ /= u8strv;
     load_manifest();
 
-    const std::filesystem::path lz4_directory =
-        reinterpret_cast<const char8_t*>(lz4_directory_.c_str());
+    u8strv = {reinterpret_cast<const char8_t*>(lz4_directory_.c_str()),
+              lz4_directory_.size()};
+    const std::filesystem::path lz4_directory = u8strv;
     create_directories(lz4_directory, ec);
   }
 
@@ -143,10 +148,14 @@ class sink_file_imp {
       std::format_to(std::back_inserter(temp), "{}_{}_{:04d}.log", name_,
                      manifest_.day, manifest_.seq);
     }
-    temp.push_back('\0');
 
-    file_name_ = reinterpret_cast<const char8_t*>(directory_.c_str());
-    file_name_ /= reinterpret_cast<const char8_t*>(temp.begin_read());
+    std::u8string_view u8strv(
+        reinterpret_cast<const char8_t*>(directory_.c_str()),
+        directory_.size());
+    file_name_ = u8strv;
+    u8strv = {reinterpret_cast<const char8_t*>(temp.begin_read()),
+              temp.readable()};
+    file_name_ /= u8strv;
     if (std::filesystem::exists(file_name_)) {
       file_size_ = std::filesystem::file_size(file_name_);
     }

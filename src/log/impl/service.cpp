@@ -58,8 +58,9 @@ struct lz4_data {
     auto stamp = std::chrono::high_resolution_clock::now();
     // 转成utf-8指针
     std::ifstream input;
-    std::filesystem::path path_src =
-        reinterpret_cast<const char8_t*>(src.c_str());
+    std::u8string_view u8strv(reinterpret_cast<const char8_t*>(src.c_str()),
+                              src.size());
+    std::filesystem::path path_src = u8strv;
     input.open(path_src, std::ios_base::binary);
     if (!input.is_open()) {
       print_stderr("compress open input {} fail\n", src);
@@ -68,8 +69,9 @@ struct lz4_data {
 
     // 转成utf-8指针
     std::ofstream output;
-    std::filesystem::path path_dest =
-        reinterpret_cast<const char8_t*>(directory.c_str());
+    u8strv = {reinterpret_cast<const char8_t*>(directory.c_str()),
+              directory.size()};
+    std::filesystem::path path_dest = u8strv;
     path_dest /= path_src.filename();
     path_dest.replace_extension(".log.lz4");
     output.open(path_dest, std::ios_base::binary | std::ios_base::trunc);
@@ -270,6 +272,16 @@ class service_impl {
     return push_lz4_message(msg);
   }
 
+  void clear_lz4(const detail::string& name, std::string_view lz4_directory,
+                 std::uint32_t keep_days) {
+    lz4_message msg;
+    msg.tp = lz4_message::type::clear;
+    msg.lz4_directory = lz4_directory;
+    msg.file_name = name;
+    msg.keep_days = keep_days;
+    return push_lz4_message(msg);
+  }
+
  private:
   struct lz4_message;
   void push_lz4_message(lz4_message& msg) {
@@ -342,6 +354,8 @@ class service_impl {
     }
   }
 
+  void clear_lz4_files(const lz4_message& msg) {}
+
   void lz4_run() {  // NOLINT(*-make-member-function-const)
     while (true) {
       detail::deque<lz4_message> queue;
@@ -358,6 +372,8 @@ class service_impl {
       for (auto& msg : queue) {
         if (msg.tp == lz4_message::type::lz4) {
           lz4_data_.compress(msg.file_name, msg.lz4_directory);
+        } else if (msg.tp == lz4_message::type::clear) {
+          clear_lz4_files(msg);
         }
       }
 
@@ -450,7 +466,13 @@ auto service::create_logger(const std::string_view& name,  // NOLINT
 // ReSharper disable once CppMemberFunctionMayBeConst
 void service::post_lz4(const std::filesystem::path& file_name,
                        const std::string_view lz4_directory) {
-  impl_->post_lz4(file_name, lz4_directory);
+  return impl_->post_lz4(file_name, lz4_directory);
+}
+
+void service::clear_lz4(const detail::string& name,
+                        std::string_view lz4_directory,
+                        std::uint32_t keep_days) {
+  return impl_->clear_lz4(name, lz4_directory, keep_days);
 }
 
 }  // namespace jt::log

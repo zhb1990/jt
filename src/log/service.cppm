@@ -8,6 +8,7 @@ import std;
 import :detail.memory;
 import :detail.buffer;
 import :detail.vector;
+import :detail.string;
 import :log.level;
 import :log.sink;
 import :log.fwd;
@@ -58,6 +59,9 @@ class service {
 
   void post_lz4(const std::filesystem::path& file_name,
                 std::string_view lz4_directory);
+
+  void clear_lz4(const detail::string& name, std::string_view lz4_directory,
+                 std::uint32_t keep_days);
 
  private:
   detail::unique_ptr<service_impl> impl_;
