@@ -76,6 +76,7 @@ class sink_file_imp {
                               std::istreambuf_iterator<char>());
     const simdjson::padded_string padded_data(data.c_str(), data.size());
     simdjson::ondemand::document doc;
+    // ReSharper disable once CppTooWideScopeInitStatement
     simdjson::ondemand::parser parser;
     if (parser.iterate(padded_data).get(doc)) {
       return;
