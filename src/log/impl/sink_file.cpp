@@ -48,7 +48,10 @@ class sink_file_imp {
     }
 
     if (!file_.is_open()) {
-      return;
+      file_open();
+      if (!file_.is_open()) {
+        return;
+      }
     }
 
     file_.write(reinterpret_cast<const char*>(buf.begin_read()),
@@ -127,7 +130,9 @@ class sink_file_imp {
       ++manifest_.seq;
       save_manifest();
     }
+  }
 
+  void file_open() {
     detail::buffer_1k temp;
     if (manifest_.seq == 0) {  // NOLINT(*-branch-clone)
       std::format_to(std::back_inserter(temp), "{}_{}.log", name_,
