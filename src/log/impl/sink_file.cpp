@@ -42,14 +42,15 @@ class sink_file_imp {
 
   void write(const sink::time_point& point, const detail::buffer_1k& buf) {
     if (tomorrow_ < point) {
-      if (keep_days_ > 0 && tomorrow_ != std::chrono::sys_days()) {
-        service_.clear_lz4(name_, lz4_directory_, keep_days_);
-      }
-
+      const auto old_day = manifest_.day;
       tomorrow_ =
           std::chrono::floor<std::chrono::days>(point) + std::chrono::days(1);
       if (daily_rotation_ || manifest_.day == 0) {
         rotate();
+      }
+
+      if (keep_days_ > 0 && old_day > 0) {
+        service_.clear_lz4(name_, lz4_directory_, keep_days_);
       }
     }
 
@@ -111,6 +112,7 @@ class sink_file_imp {
                                             std::chrono::month(month),
                                             std::chrono::day(m_day));
     tomorrow_ += std::chrono::days{1};
+    return file_open();
   }
 
   void save_manifest() {

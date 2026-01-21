@@ -79,6 +79,7 @@ set(JT_MODULES
     "src/log/default_formatter.cppm"
     "src/log/sink_console.cppm"
     "src/log/sink_file.cppm"
+    "src/log/functions.cppm"
 )
 
 set(JT_HEADERS "src/detail/config.h")
