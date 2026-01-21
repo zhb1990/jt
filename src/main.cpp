@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
     jt::log::sink_file_config config;
     config.daily_rotation = true;
     config.directory = "./";
-    config.keep_days = 2;
+    config.keep_days = 1;
     config.lz4_directory = "./lz4";
     config.max_size = 1024;
     config.name = "test";

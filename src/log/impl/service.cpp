@@ -48,13 +48,14 @@ struct lz4_data {
         LZ4F_compressBound(lz4_input_chunk_size, &lz4_preferences));
     if (const size_t ec = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
         LZ4F_isError(ec)) {
-      throw lz4_exception(ec);
+      throw lz4_exception(ec);  // NOLINT
     }
   }
 
   ~lz4_data() noexcept { LZ4F_freeCompressionContext(ctx); }
 
-  void compress(const detail::string& src, const detail::string& directory) {
+  void compress(  // NOLINT(*-convert-member-functions-to-static)
+      const detail::string& src, const detail::string& directory) {
     auto stamp = std::chrono::high_resolution_clock::now();
     // 转成utf-8指针
     std::ifstream input;
@@ -82,23 +83,24 @@ struct lz4_data {
 
     std::uint64_t count_out = 0;
     std::uint64_t count_in = 0;
-    if (compress_file(output, count_out, count_in, input)) {
-      if (count_in > 0) {
-        auto cost = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::high_resolution_clock::now() - stamp)
-                        .count();
-        auto rate =
-            static_cast<double>(count_out) / static_cast<double>(count_in);
-        print_stderr("{}: compress {} -> {} bytes, {:.2}, {}ms\n", src,
-                     count_in, count_out, rate, cost);
-      }
-      input.close();
-      std::error_code ec;
-      std::filesystem::remove(path_src, ec);
-      if (ec) {
-        print_stderr("after compress remove fail, {}\n",
-                     detail::system_category().message(ec.value()));
-      }
+    if (!compress_file(output, count_out, count_in, input)) {
+      return;
+    }
+
+    if (count_in > 0) {
+      auto cost = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::high_resolution_clock::now() - stamp)
+                      .count();
+      auto rate =
+          static_cast<double>(count_out) / static_cast<double>(count_in);
+      print_stdout("{}: compress {} -> {} bytes, {:.2}, {}ms\n", src, count_in,
+                   count_out, rate, cost);
+    }
+
+    input.close();
+    if (std::error_code ec; !std::filesystem::remove(path_src, ec)) {
+      print_stderr("after compress remove fail, {}\n",
+                   detail::system_category().message(ec.value()));
     }
   }
 
@@ -272,8 +274,9 @@ class service_impl {
     return push_lz4_message(msg);
   }
 
-  void clear_lz4(const detail::string& name, std::string_view lz4_directory,
-                 std::uint32_t keep_days) {
+  void clear_lz4(const detail::string& name,
+                 const std::string_view lz4_directory,
+                 const std::uint32_t keep_days) {
     lz4_message msg;
     msg.tp = lz4_message::type::clear;
     msg.lz4_directory = lz4_directory;
@@ -284,7 +287,7 @@ class service_impl {
 
  private:
   struct lz4_message;
-  void push_lz4_message(lz4_message& msg) {
+  void push_lz4_message(lz4_message& msg) {  // NOLINT
     std::scoped_lock lock{lz4_mutex_};
     if (lz4_stop_requested_) return;
 
@@ -354,7 +357,84 @@ class service_impl {
     }
   }
 
-  void clear_lz4_files(const lz4_message& msg) {}
+  void clear_lz4_files(const lz4_message& msg) {  // NOLINT
+    if (msg.keep_days == 0) return;
+
+    namespace fs = std::filesystem;
+    using namespace std::chrono;
+    using namespace std::chrono_literals;
+    const std::u8string_view u8strv{
+        reinterpret_cast<const char8_t*>(msg.lz4_directory.c_str()),
+        msg.lz4_directory.size()};
+    const fs::path directory = u8strv;
+    const auto now = system_clock::now();
+    const auto cutoff = now - msg.keep_days * 24h;
+    std::error_code ec;
+    if (!fs::exists(directory, ec)) {
+      if (ec) {
+        return print_stderr("Error checking existence of '{}': {}",
+                            msg.lz4_directory,
+                            detail::system_category().message(ec.value()));
+      }
+      return print_stderr("Path is not exists '{}'", msg.lz4_directory);
+    }
+
+    if (!fs::is_directory(directory, ec)) {
+      if (ec) {
+        return print_stderr("Error checking if directory '{}': {}",
+                            msg.lz4_directory,
+                            detail::system_category().message(ec.value()));
+      }
+      return print_stderr("Path is not a directory: '{}'", msg.lz4_directory);
+    }
+
+    fs::directory_iterator iter(directory, ec);
+    if (ec) {
+      return print_stderr("Failed to open directory '{}': {}",
+                          msg.lz4_directory,
+                          detail::system_category().message(ec.value()));
+    }
+
+    for (const auto& entry : iter) {
+      const auto filename = entry.path().filename().u8string();
+      std::string_view strv{reinterpret_cast<const char*>(filename.c_str()),
+                            filename.size()};
+      if (!entry.is_regular_file(ec)) {
+        if (ec) {
+          print_stderr("cannot stat file '{}': {}", strv,
+                       detail::system_category().message(ec.value()));
+        }
+        continue;
+      }
+
+      if (!strv.starts_with(msg.file_name) || !strv.ends_with(".log.lz4")) {
+        continue;
+      }
+
+      // 获取最后修改时间
+      auto last_write = entry.last_write_time(ec);
+      if (ec) {
+        print_stderr("cannot get mtime of '{}': {}", strv,
+                     detail::system_category().message(ec.value()));
+        continue;
+      }
+
+      auto file_time_as_sys =
+          std::chrono::clock_cast<std::chrono::system_clock>(last_write);
+      if (file_time_as_sys < cutoff) {
+        // 删除文件
+        if (fs::remove(entry.path(), ec)) {
+          print_stdout(
+              "Removed old file ({}days old): {}",
+              duration_cast<hours>(cutoff - file_time_as_sys).count() / 24.0,
+              strv);
+        } else {
+          print_stderr("Failed to remove '{}': {}", strv,
+                       detail::system_category().message(ec.value()));
+        }
+      }
+    }
+  }
 
   void lz4_run() {  // NOLINT(*-make-member-function-const)
     while (true) {
@@ -469,9 +549,10 @@ void service::post_lz4(const std::filesystem::path& file_name,
   return impl_->post_lz4(file_name, lz4_directory);
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void service::clear_lz4(const detail::string& name,
-                        std::string_view lz4_directory,
-                        std::uint32_t keep_days) {
+                        const std::string_view lz4_directory,
+                        const std::uint32_t keep_days) {
   return impl_->clear_lz4(name, lz4_directory, keep_days);
 }
 

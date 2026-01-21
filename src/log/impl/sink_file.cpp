@@ -42,6 +42,10 @@ class sink_file_imp {
 
   void write(const sink::time_point& point, const detail::buffer_1k& buf) {
     if (tomorrow_ < point) {
+      if (keep_days_ > 0 && tomorrow_ != std::chrono::sys_days()) {
+        service_.clear_lz4(name_, lz4_directory_, keep_days_);
+      }
+
       tomorrow_ =
           std::chrono::floor<std::chrono::days>(point) + std::chrono::days(1);
       if (daily_rotation_ || manifest_.day == 0) {
