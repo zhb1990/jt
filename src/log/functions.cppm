@@ -281,22 +281,6 @@ struct vlog {
     }
   }
 
-  vlog(const std::shared_ptr<logger>& logger, const level lv,
-       const std::u8string_view fmt, Args&&... args,
-       const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(lv)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(0, lv, buf, source);
-    } catch (...) {
-    }
-  }
-
   vlog(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
        const level lv, const std::string_view fmt, Args&&... args,
        const std::source_location& source = std::source_location::current()) {
@@ -310,22 +294,6 @@ struct vlog {
     } catch (...) {
     }
   }
-
-  vlog(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-       const level lv, const std::u8string_view fmt, Args&&... args,
-       const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(lv)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, lv, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -333,16 +301,8 @@ vlog(const std::shared_ptr<logger>& logger, level lv, std::string_view fmt,
      Args&&... args) -> vlog<Args...>;
 
 template <typename... Args>
-vlog(const std::shared_ptr<logger>& logger, level lv, std::u8string_view fmt,
-     Args&&... args) -> vlog<Args...>;
-
-template <typename... Args>
 vlog(std::uint32_t sid, const std::shared_ptr<logger>& logger, level lv,
      std::string_view fmt, Args&&... args) -> vlog<Args...>;
-
-template <typename... Args>
-vlog(std::uint32_t sid, const std::shared_ptr<logger>& logger, level lv,
-     std::u8string_view fmt, Args&&... args) -> vlog<Args...>;
 
 template <typename... Args>
 struct vcritical {
@@ -355,23 +315,6 @@ struct vcritical {
     try {
       detail::buffer_1k buf;
       std::vformat_to(std::back_inserter(buf), fmt,
-                      std::make_format_args(args...));
-      logger->log(0, level::critical, buf, source);
-    } catch (...) {
-    }
-  }
-
-  vcritical(
-      const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
-      Args&&... args,
-      const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::critical)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
                       std::make_format_args(args...));
       logger->log(0, level::critical, buf, source);
     } catch (...) {
@@ -392,23 +335,6 @@ struct vcritical {
     } catch (...) {
     }
   }
-
-  vcritical(
-      const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-      const std::u8string_view fmt, Args&&... args,
-      const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::critical)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, level::critical, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -416,16 +342,8 @@ vcritical(const std::shared_ptr<logger>& logger, std::string_view fmt,
           Args&&... args) -> vcritical<Args...>;
 
 template <typename... Args>
-vcritical(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
-          Args&&... args) -> vcritical<Args...>;
-
-template <typename... Args>
 vcritical(std::uint32_t sid, const std::shared_ptr<logger>& logger,
           std::string_view fmt, Args&&... args) -> vcritical<Args...>;
-
-template <typename... Args>
-vcritical(std::uint32_t sid, const std::shared_ptr<logger>& logger,
-          std::u8string_view fmt, Args&&... args) -> vcritical<Args...>;
 
 template <typename... Args>
 struct verror {
@@ -443,22 +361,6 @@ struct verror {
     }
   }
 
-  verror(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
-         Args&&... args,
-         const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::error)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(0, level::error, buf, source);
-    } catch (...) {
-    }
-  }
-
   verror(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
          const std::string_view fmt, Args&&... args,
          const std::source_location& source = std::source_location::current()) {
@@ -472,22 +374,6 @@ struct verror {
     } catch (...) {
     }
   }
-
-  verror(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-         const std::u8string_view fmt, Args&&... args,
-         const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::error)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, level::error, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -495,16 +381,8 @@ verror(const std::shared_ptr<logger>& logger, std::string_view fmt,
        Args&&... args) -> verror<Args...>;
 
 template <typename... Args>
-verror(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
-       Args&&... args) -> verror<Args...>;
-
-template <typename... Args>
 verror(std::uint32_t sid, const std::shared_ptr<logger>& logger,
        std::string_view fmt, Args&&... args) -> verror<Args...>;
-
-template <typename... Args>
-verror(std::uint32_t sid, const std::shared_ptr<logger>& logger,
-       std::u8string_view fmt, Args&&... args) -> verror<Args...>;
 
 template <typename... Args>
 struct vwarn {
@@ -522,22 +400,6 @@ struct vwarn {
     }
   }
 
-  vwarn(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
-        Args&&... args,
-        const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::warn)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(0, level::warn, buf, source);
-    } catch (...) {
-    }
-  }
-
   vwarn(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
         const std::string_view fmt, Args&&... args,
         const std::source_location& source = std::source_location::current()) {
@@ -551,22 +413,6 @@ struct vwarn {
     } catch (...) {
     }
   }
-
-  vwarn(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-        const std::u8string_view fmt, Args&&... args,
-        const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::warn)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, level::warn, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -574,16 +420,8 @@ vwarn(const std::shared_ptr<logger>& logger, std::string_view fmt,
       Args&&... args) -> vwarn<Args...>;
 
 template <typename... Args>
-vwarn(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
-      Args&&... args) -> vwarn<Args...>;
-
-template <typename... Args>
 vwarn(std::uint32_t sid, const std::shared_ptr<logger>& logger,
       std::string_view fmt, Args&&... args) -> vwarn<Args...>;
-
-template <typename... Args>
-vwarn(std::uint32_t sid, const std::shared_ptr<logger>& logger,
-      std::u8string_view fmt, Args&&... args) -> vwarn<Args...>;
 
 template <typename... Args>
 struct vinfo {
@@ -601,22 +439,6 @@ struct vinfo {
     }
   }
 
-  vinfo(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
-        Args&&... args,
-        const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::info)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(0, level::info, buf, source);
-    } catch (...) {
-    }
-  }
-
   vinfo(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
         const std::string_view fmt, Args&&... args,
         const std::source_location& source = std::source_location::current()) {
@@ -630,22 +452,6 @@ struct vinfo {
     } catch (...) {
     }
   }
-
-  vinfo(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-        const std::u8string_view fmt, Args&&... args,
-        const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::info)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, level::info, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -653,16 +459,8 @@ vinfo(const std::shared_ptr<logger>& logger, std::string_view fmt,
       Args&&... args) -> vinfo<Args...>;
 
 template <typename... Args>
-vinfo(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
-      Args&&... args) -> vinfo<Args...>;
-
-template <typename... Args>
 vinfo(std::uint32_t sid, const std::shared_ptr<logger>& logger,
       std::string_view fmt, Args&&... args) -> vinfo<Args...>;
-
-template <typename... Args>
-vinfo(std::uint32_t sid, const std::shared_ptr<logger>& logger,
-      std::u8string_view fmt, Args&&... args) -> vinfo<Args...>;
 
 template <typename... Args>
 struct vtrace {
@@ -674,22 +472,6 @@ struct vtrace {
     try {
       detail::buffer_1k buf;
       std::vformat_to(std::back_inserter(buf), fmt,
-                      std::make_format_args(args...));
-      logger->log(0, level::trace, buf, source);
-    } catch (...) {
-    }
-  }
-
-  vtrace(const std::shared_ptr<logger>& logger, const std::u8string_view fmt,
-         Args&&... args,
-         const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::trace)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
                       std::make_format_args(args...));
       logger->log(0, level::trace, buf, source);
     } catch (...) {
@@ -709,22 +491,6 @@ struct vtrace {
     } catch (...) {
     }
   }
-
-  vtrace(const std::uint32_t sid, const std::shared_ptr<logger>& logger,
-         const std::u8string_view fmt, Args&&... args,
-         const std::source_location& source = std::source_location::current()) {
-    if (!logger->should_log(level::trace)) return;
-
-    try {
-      detail::buffer_1k buf;
-      const std::string_view temp(reinterpret_cast<const char*>(fmt.data()),
-                                  fmt.size());
-      std::vformat_to(std::back_inserter(buf), temp,
-                      std::make_format_args(args...));
-      logger->log(sid, level::trace, buf, source);
-    } catch (...) {
-    }
-  }
 };
 
 template <typename... Args>
@@ -732,15 +498,7 @@ vtrace(const std::shared_ptr<logger>& logger, std::string_view fmt,
        Args&&... args) -> vtrace<Args...>;
 
 template <typename... Args>
-vtrace(const std::shared_ptr<logger>& logger, std::u8string_view fmt,
-       Args&&... args) -> vtrace<Args...>;
-
-template <typename... Args>
 vtrace(std::uint32_t sid, const std::shared_ptr<logger>& logger,
        std::string_view fmt, Args&&... args) -> vtrace<Args...>;
-
-template <typename... Args>
-vtrace(std::uint32_t sid, const std::shared_ptr<logger>& logger,
-       std::u8string_view fmt, Args&&... args) -> vtrace<Args...>;
 
 }  // namespace jt::log
