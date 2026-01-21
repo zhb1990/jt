@@ -42,16 +42,16 @@ class JT_API sink_stderr final : public sink {
   sink_console_impl& impl_;
 };
 
-JT_API void wtire_stdout(const detail::buffer_1k& buf);
+JT_API void write_stdout(const detail::buffer_1k& buf);
 
-JT_API void wtire_stderr(const detail::buffer_1k& buf);
+JT_API void write_stderr(const detail::buffer_1k& buf);
 
 template <typename... Args>
 void print_stderr(std::format_string<Args...> fmt, Args&&... args) {
   try {
     detail::buffer_1k buf;
     std::format_to(std::back_inserter(buf), fmt, std::forward<Args>(args)...);
-    wtire_stderr(buf);
+    write_stderr(buf);
   } catch (...) {
   }
 }
@@ -61,7 +61,7 @@ void print_stdout(std::format_string<Args...> fmt, Args&&... args) {
   try {
     detail::buffer_1k buf;
     std::format_to(std::back_inserter(buf), fmt, std::forward<Args>(args)...);
-    wtire_stdout(buf);
+    write_stdout(buf);
   } catch (...) {
   }
 }

@@ -235,11 +235,11 @@ void sink_stderr::write(const level lv, const time_point&,
 
 void sink_stderr::flush_unlock() { return impl_.flush_unlock(); }
 
-void wtire_stdout(const detail::buffer_1k& buf) {
+void write_stdout(const detail::buffer_1k& buf) {
   console_stdout.write(level::info, buf, 0, buf.readable());
 }
 
-void wtire_stderr(const detail::buffer_1k& buf) {
+void write_stderr(const detail::buffer_1k& buf) {
   console_stdout.write(level::error, buf, 0, buf.readable());
 }
 

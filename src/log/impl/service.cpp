@@ -372,25 +372,25 @@ class service_impl {
     std::error_code ec;
     if (!fs::exists(directory, ec)) {
       if (ec) {
-        return print_stderr("Error checking existence of '{}': {}",
+        return print_stderr("Error checking existence of '{}': {}\n",
                             msg.lz4_directory,
                             detail::system_category().message(ec.value()));
       }
-      return print_stderr("Path is not exists '{}'", msg.lz4_directory);
+      return print_stderr("Path is not exists '{}'\n", msg.lz4_directory);
     }
 
     if (!fs::is_directory(directory, ec)) {
       if (ec) {
-        return print_stderr("Error checking if directory '{}': {}",
+        return print_stderr("Error checking if directory '{}': {}\n",
                             msg.lz4_directory,
                             detail::system_category().message(ec.value()));
       }
-      return print_stderr("Path is not a directory: '{}'", msg.lz4_directory);
+      return print_stderr("Path is not a directory: '{}'\n", msg.lz4_directory);
     }
 
     fs::directory_iterator iter(directory, ec);
     if (ec) {
-      return print_stderr("Failed to open directory '{}': {}",
+      return print_stderr("Failed to open directory '{}': {}\n",
                           msg.lz4_directory,
                           detail::system_category().message(ec.value()));
     }
@@ -401,7 +401,7 @@ class service_impl {
                             filename.size()};
       if (!entry.is_regular_file(ec)) {
         if (ec) {
-          print_stderr("cannot stat file '{}': {}", strv,
+          print_stderr("cannot stat file '{}': {}\n", strv,
                        detail::system_category().message(ec.value()));
         }
         continue;
@@ -414,7 +414,7 @@ class service_impl {
       // 获取最后修改时间
       auto last_write = entry.last_write_time(ec);
       if (ec) {
-        print_stderr("cannot get mtime of '{}': {}", strv,
+        print_stderr("cannot get mtime of '{}': {}\n", strv,
                      detail::system_category().message(ec.value()));
         continue;
       }
@@ -425,11 +425,11 @@ class service_impl {
         // 删除文件
         if (fs::remove(entry.path(), ec)) {
           print_stdout(
-              "Removed old file ({}days old): {}",
+              "Removed old file ({}days old): {}\n",
               duration_cast<hours>(cutoff - file_time_as_sys).count() / 24.0,
               strv);
         } else {
-          print_stderr("Failed to remove '{}': {}", strv,
+          print_stderr("Failed to remove '{}': {}\n", strv,
                        detail::system_category().message(ec.value()));
         }
       }
