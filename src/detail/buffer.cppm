@@ -316,7 +316,7 @@ class base_memory_buffer : public channel_buffer {
     // ReSharper disable once CppDFAConstantConditions
     if (using_heap_) {
       // ReSharper disable once CppDFAUnreachableCode
-      deallocate(data_, capacity_);
+      deallocate(data_);
     }
   }
 
@@ -328,7 +328,7 @@ class base_memory_buffer : public channel_buffer {
 
   void release() {
     if (using_heap_) {
-      deallocate(data_, capacity_);
+      deallocate(data_);
       data_ = store_;
       capacity_ = Fixed;
       using_heap_ = false;
@@ -367,7 +367,7 @@ class base_memory_buffer : public channel_buffer {
   auto operator=(base_memory_buffer&& other) noexcept -> base_memory_buffer& {
     if (this != std::addressof(other)) {
       if (using_heap_) {
-        deallocate(data_, capacity_);
+        deallocate(data_);
       }
 
       if (other.using_heap_) {
@@ -446,7 +446,7 @@ class base_memory_buffer : public channel_buffer {
     void* new_data = allocate(new_capacity);
     std::memcpy(new_data, old_data, write_);
     if (using_heap_) {
-      deallocate(old_data, old_capacity);
+      deallocate(old_data);
     }
 
     data_ = new_data;

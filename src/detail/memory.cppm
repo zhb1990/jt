@@ -12,9 +12,9 @@ export namespace jt::detail {
 
 JT_API auto allocate(std::size_t size) -> void*;
 
-JT_API auto allocated_size(void* ptr) -> std::size_t;
+JT_API auto allocated_size(const void* ptr) -> std::size_t;
 
-JT_API void deallocate(void* ptr, std::size_t size);
+JT_API void deallocate(void* ptr);
 
 JT_API auto allocated_memory() -> std::int64_t;
 
@@ -48,9 +48,7 @@ class allocator {
   }
 
   // ReSharper disable once CppMemberFunctionMayBeStatic
-  void deallocate(T* const ptr, const std::size_t) {
-    detail::deallocate(ptr, 0);
-  }
+  void deallocate(T* const ptr, const std::size_t) { detail::deallocate(ptr); }
 
   [[nodiscard]] auto allocate(const std::size_t count, const void*) -> T* {
     return this->allocate(count);
@@ -92,7 +90,7 @@ struct deleter {
   void operator()(T* ptr) const noexcept {
     static_assert(sizeof(*ptr), "can't delete an incomplete type");
     ptr->~T();
-    return deallocate(ptr, sizeof(T));
+    return deallocate(ptr);
   }
 };
 
@@ -112,7 +110,7 @@ struct dynamic_deleter {
 
   void operator()(Base* ptr) const noexcept {
     ptr->~Base();
-    return detail::deallocate(raw_ptr, 0);
+    return deallocate(raw_ptr);
   }
 };
 
@@ -122,8 +120,8 @@ using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
 template <typename Base, typename Derived, typename... Types>
   requires(std::is_base_of_v<Base, Derived>)
 auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
-  auto* ptr = ::new (detail::allocate(sizeof(Derived)))
-      Derived(std::forward<Types>(args)...);
+  auto* ptr =
+      ::new (allocate(sizeof(Derived))) Derived(std::forward<Types>(args)...);
   return dynamic_unique_ptr<Base>{dynamic_cast<Base*>(ptr), {ptr}};
 }
 

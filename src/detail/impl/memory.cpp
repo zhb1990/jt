@@ -1,6 +1,6 @@
 module;
 
-#include <cassert>
+#include <mimalloc.h>
 
 // module jt:detail.memory;
 module jt;
@@ -11,24 +11,20 @@ namespace jt::detail {
 metric_value memory_total;
 
 auto allocate(const std::size_t size) -> void* {
-  const std::size_t real = size + sizeof(std::size_t);
-  void* ptr = std::malloc(real);
-  *static_cast<std::size_t*>(ptr) = size;
+  void* ptr = mi_malloc(size);
+  const auto real = mi_usable_size(ptr);
   memory_total.fetch_add(real);
-  return static_cast<char*>(ptr) + sizeof(std::size_t);
+  return ptr;
 }
 
-auto allocated_size(void* ptr) -> std::size_t {
-  ptr = static_cast<void*>(static_cast<char*>(ptr) - sizeof(std::size_t));
-  return *static_cast<std::size_t*>(ptr);
+auto allocated_size(const void* ptr) -> std::size_t {
+  return mi_usable_size(ptr);
 }
 
-void deallocate(void* ptr, const std::size_t size) {
-  ptr = static_cast<void*>(static_cast<char*>(ptr) - sizeof(std::size_t));
-  const std::size_t real = *static_cast<std::size_t*>(ptr);
-  assert(size == 0 || real == size);
-  memory_total.fetch_sub(real + sizeof(std::size_t));
-  return std::free(ptr);
+void deallocate(void* ptr) {
+  const auto real = mi_usable_size(ptr);
+  memory_total.fetch_sub(real);
+  return mi_free(ptr);
 }
 
 auto allocated_memory() -> std::int64_t { return memory_total.count(); }

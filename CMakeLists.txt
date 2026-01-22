@@ -50,6 +50,11 @@ if(NOT simdjson_FOUND)
     message(WARNING "simdjson not found.")
 endif()
 
+find_package(mimalloc CONFIG REQUIRED)
+if(NOT mimalloc_FOUND)
+    message(WARNING "mimalloc not found.")
+endif()
+
 set(JT_MODULES
     "src/jt.cppm"
 
@@ -97,7 +102,11 @@ set(JT_SOURCES
 )
 
 add_library(libjt SHARED)
-target_link_libraries(libjt PRIVATE simdjson::simdjson lz4::lz4)
+target_link_libraries(libjt PRIVATE
+        $<IF:$<TARGET_EXISTS:mimalloc-static>,mimalloc-static,mimalloc>
+        simdjson::simdjson
+        lz4::lz4
+)
 set_target_properties(libjt PROPERTIES PREFIX "")
 if(APPLE)
     target_link_directories(libjt PUBLIC ${CMAKE_LLVM_PREFIX}/lib/c++)

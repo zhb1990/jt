@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
       void* ptr = jt::detail::allocate(100);
       jt::log::info(log1, "mem {}", jt::detail::allocated_memory());
       jt::log::info(log1, "ptr size {}", jt::detail::allocated_size(ptr));
-      jt::detail::deallocate(ptr, 100);
+      jt::detail::deallocate(ptr);
       jt::log::info(log1, "mem {}", jt::detail::allocated_memory());
     }
 
