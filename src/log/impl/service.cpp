@@ -294,6 +294,7 @@ class service_impl {
     lz4_queue_.emplace_back(std::move(msg));
     lz4_cv_.notify_one();
   }
+
   void push_log_message(message* msg) {
     std::ptrdiff_t n =
         writer_submission_counter_.fetch_add(1, std::memory_order::relaxed);
@@ -367,7 +368,7 @@ class service_impl {
         reinterpret_cast<const char8_t*>(msg.lz4_directory.c_str()),
         msg.lz4_directory.size()};
     const fs::path directory = u8strv;
-    const auto now = system_clock::now();
+    const auto now = file_clock::now();
     const auto cutoff = now - msg.keep_days * 24h;
     std::error_code ec;
     if (!fs::exists(directory, ec)) {
@@ -419,15 +420,12 @@ class service_impl {
         continue;
       }
 
-      auto file_time_as_sys =
-          std::chrono::clock_cast<std::chrono::system_clock>(last_write);
-      if (file_time_as_sys < cutoff) {
+      if (last_write < cutoff) {
         // 删除文件
         if (fs::remove(entry.path(), ec)) {
-          print_stdout(
-              "Removed old file ({}days old): {}\n",
-              duration_cast<hours>(cutoff - file_time_as_sys).count() / 24.0,
-              strv);
+          print_stdout("Removed old file ({}days old): {}\n",
+                       duration_cast<hours>(cutoff - last_write).count() / 24.0,
+                       strv);
         } else {
           print_stderr("Failed to remove '{}': {}\n", strv,
                        detail::system_category().message(ec.value()));
@@ -443,10 +441,10 @@ class service_impl {
       {
         std::unique_lock lock{lz4_mutex_};
         lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
-          return !lz4_queue_.empty() || writer_stop_requested_;
+          return !lz4_queue_.empty() || lz4_stop_requested_;
         });
         queue = std::move(lz4_queue_);
-        stop_requested = writer_stop_requested_;
+        stop_requested = lz4_stop_requested_;
       }
 
       for (auto& msg : queue) {

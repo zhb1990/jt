@@ -1,6 +1,6 @@
 module;
 
-#include <simdjson.h>
+#include "rapidjson/document.h"
 
 // module jt:log.sink.file;
 module jt;
@@ -85,26 +85,26 @@ class sink_file_imp {
 
     const detail::string data((std::istreambuf_iterator(manifest)),
                               std::istreambuf_iterator<char>());
-    const simdjson::padded_string padded_data(data.c_str(), data.size());
-    simdjson::ondemand::document doc;
-    // ReSharper disable once CppTooWideScopeInitStatement
-    simdjson::ondemand::parser parser;
-    if (parser.iterate(padded_data).get(doc)) {
+    rapidjson::Document document;
+    document.Parse(data.c_str(), data.size());
+    if (document.HasParseError() || !document.IsObject()) {
       return;
     }
 
-    std::uint32_t day{0};
-    if (doc["day"].get(day)) {
+    const auto root = document.GetObject();
+    auto it = root.FindMember("day");
+    if (it == root.MemberEnd() || !it->value.IsUint()) {
       return;
     }
 
-    std::uint32_t seq{0};
-    if (doc["seq"].get(seq)) {
+    auto day = static_cast<std::uint32_t>(it->value.GetUint());
+    it = root.FindMember("seq");
+    if (it == root.MemberEnd() || !it->value.IsUint()) {
       return;
     }
 
+    manifest_.seq = static_cast<std::uint32_t>(it->value.GetUint());
     manifest_.day = day;
-    manifest_.seq = seq;
     const int year = static_cast<int>(day / 10000);
     const int month = static_cast<int>(day % 10000) / 100;
     const int m_day = static_cast<int>(day % 100);

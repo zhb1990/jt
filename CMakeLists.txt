@@ -45,9 +45,9 @@ if(NOT asio_FOUND)
     message(WARNING "asio not found.")
 endif()
 
-find_package(simdjson CONFIG REQUIRED)
-if(NOT simdjson_FOUND)
-    message(WARNING "simdjson not found.")
+find_package(RapidJSON CONFIG REQUIRED)
+if(NOT RapidJSON_FOUND)
+    message(WARNING "RapidJSON not found.")
 endif()
 
 find_package(mimalloc CONFIG REQUIRED)
@@ -104,7 +104,7 @@ set(JT_SOURCES
 add_library(libjt SHARED)
 target_link_libraries(libjt PRIVATE
         $<IF:$<TARGET_EXISTS:mimalloc-static>,mimalloc-static,mimalloc>
-        simdjson::simdjson
+        RapidJSON
         lz4::lz4
 )
 set_target_properties(libjt PROPERTIES PREFIX "")
