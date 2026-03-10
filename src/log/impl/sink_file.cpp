@@ -1,6 +1,6 @@
 module;
 
-#include "rapidjson/document.h"
+#include <rapidjson/document.h>
 
 // module jt:log.sink.file;
 module jt;

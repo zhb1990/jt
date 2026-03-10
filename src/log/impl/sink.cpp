@@ -41,8 +41,6 @@ class sink_impl {
 
  private:
   std::atomic<level> lv_{level::trace};
-  char padding[detail::cache_line_bytes - sizeof(std::atomic<level>)];
-
   sink::formatter_ptr formatter_;
   std::mutex mtx_;
 };
