@@ -43,9 +43,8 @@ class metric_value {
     return datas_[index].value;
   }
 
-  struct data {
+  struct alignas(cache_line_bytes) data {
     std::atomic_int64_t value{0};
-    char padding[cache_line_bytes - sizeof(std::atomic_int64_t)];
   };
 
   std::uint32_t size_{0};
