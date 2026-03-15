@@ -163,6 +163,11 @@ class service_impl {
 
   ~service_impl() { stop(); }
 
+  /**
+   * 注册日志记录器
+   * @param ptr 要注册的日志记录器共享指针
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void register_logger(logger_sptr& ptr) {  // NOLINT
     const auto name = ptr->get_name();
     std::scoped_lock lock{loggers_mutex_};
@@ -172,6 +177,12 @@ class service_impl {
     loggers_.emplace(name, ptr);
   }
 
+  /**
+   * 查找日志记录器
+   * @param name 日志记录器名称
+   * @return 日志记录器共享指针，如果未找到则返回空指针
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   logger_sptr find(const std::string_view name) {  // NOLINT
     std::scoped_lock lock{loggers_mutex_};
     if (const auto it = loggers_.find(name); it == loggers_.end()) {
@@ -181,11 +192,20 @@ class service_impl {
     }
   }
 
+  /**
+   * 删除日志记录器
+   * @param name 要删除的日志记录器名称
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void erase(const std::string_view name) {  // NOLINT
     std::scoped_lock lock{loggers_mutex_};
     loggers_.erase(name);
   }
 
+  /**
+   * 清除所有日志记录器
+   * @note 此函数被标记为NOLINT以避免误报
+   */
   void clear() {  // NOLINT(*-convert-member-functions-to-static)
     {
       std::scoped_lock lock{loggers_mutex_};
@@ -194,6 +214,10 @@ class service_impl {
     set_default({});
   }
 
+  /**
+   * 启动日志服务
+   * @note 此函数被标记为NOLINT以避免误报
+   */
   void start() {  // NOLINT(*-convert-member-functions-to-static)
     if (writer_thread_.joinable() || lz4_thread_.joinable()) return;
 
@@ -202,6 +226,9 @@ class service_impl {
     lz4_thread_ = std::thread{[this]() { return lz4_run(); }};
   }
 
+  /**
+   * 停止日志服务
+   */
   void stop() {
     {
       std::scoped_lock lock{writer_mutex_};
@@ -222,6 +249,11 @@ class service_impl {
     }
   }
 
+  /**
+   * 获取默认日志记录器
+   * @return 默认日志记录器共享指针
+   * @note 此函数被标记为NOLINT以避免误报
+   */
   auto get_default() -> logger_sptr {  // NOLINT
 #if defined(__clang__)
     std::scoped_lock lock{loggers_mutex_};
@@ -231,6 +263,11 @@ class service_impl {
 #endif
   }
 
+  /**
+   * 设置默认日志记录器
+   * @param ptr 要设置为默认的日志记录器共享指针
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void set_default(const logger_sptr& ptr) {  // NOLINT
 #if defined(__clang__)
     std::scoped_lock lock{loggers_mutex_};
@@ -240,6 +277,10 @@ class service_impl {
 #endif
   }
 
+  /**
+   * 刷新日志记录器
+   * @param ptr 要刷新的日志记录器弱指针
+   */
   void flush(const logger_wptr& ptr) {
     message* msg = message_allocator_.allocate(1);
     message_allocator_.construct(msg);
@@ -248,6 +289,14 @@ class service_impl {
     return push_log_message(msg);
   }
 
+  /**
+   * 记录日志消息
+   * @param ptr 日志记录器弱指针
+   * @param sid 来源ID
+   * @param lv 日志级别
+   * @param buf 日志缓冲区
+   * @param source 源代码位置信息
+   */
   void log(const logger_wptr& ptr, const std::uint32_t sid, const level lv,
            detail::buffer_1k& buf, const std::source_location& source) {
     message* msg = message_allocator_.allocate(1);
@@ -263,6 +312,12 @@ class service_impl {
     return push_log_message(msg);
   }
 
+  /**
+   * 发送LZ4压缩请求
+   * @param file_name 要压缩的文件名
+   * @param lz4_directory LZ4目录
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void post_lz4(const std::filesystem::path& file_name,  // NOLINT
                 const std::string_view lz4_directory) {
     const auto str = file_name.generic_u8string();
@@ -274,6 +329,12 @@ class service_impl {
     return push_lz4_message(msg);
   }
 
+  /**
+   * 清除LZ4压缩文件
+   * @param name 文件名
+   * @param lz4_directory LZ4目录
+   * @param keep_days 保留天数
+   */
   void clear_lz4(const detail::string& name,
                  const std::string_view lz4_directory,
                  const std::uint32_t keep_days) {
@@ -287,6 +348,11 @@ class service_impl {
 
  private:
   struct lz4_message;
+  /**
+   * 推送LZ4消息到队列
+   * @param msg 要推送的LZ4消息
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void push_lz4_message(lz4_message& msg) {  // NOLINT
     std::scoped_lock lock{lz4_mutex_};
     if (lz4_stop_requested_) return;
@@ -295,6 +361,10 @@ class service_impl {
     lz4_cv_.notify_one();
   }
 
+  /**
+   * 推送日志消息到队列
+   * @param msg 要推送的日志消息指针
+   */
   void push_log_message(message* msg) {
     std::ptrdiff_t n =
         writer_submission_counter_.fetch_add(1, std::memory_order::relaxed);
@@ -314,6 +384,9 @@ class service_impl {
     writer_submission_counter_.fetch_sub(1, std::memory_order::relaxed);
   }
 
+  /**
+   * 处理日志消息
+   */
   inline void writer_do_message() {
     // ReSharper disable once CppDFAUnreachableCode
     // ReSharper disable once CppDFAEndlessLoop
@@ -332,6 +405,9 @@ class service_impl {
     }
   }
 
+  /**
+   * 日志写入器线程运行函数
+   */
   void writer_run() {
     while (true) {
       writer_do_message();
@@ -358,6 +434,11 @@ class service_impl {
     }
   }
 
+  /**
+   * 清除LZ4文件
+   * @param msg 包含清除信息的LZ4消息
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void clear_lz4_files(const lz4_message& msg) {  // NOLINT
     if (msg.keep_days == 0) return;
 
@@ -434,6 +515,10 @@ class service_impl {
     }
   }
 
+  /**
+   * LZ4线程运行函数
+   * @note 此函数被标记为NOLINT以避免误报
+   */
   void lz4_run() {  // NOLINT(*-make-member-function-const)
     while (true) {
       detail::deque<lz4_message> queue;
@@ -532,6 +617,7 @@ void service::log(const logger_wptr& ptr, const std::uint32_t sid,
   return impl_->log(std::move(ptr), sid, lv, buf, source);
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 auto service::create_logger(const std::string_view& name,  // NOLINT
                             const bool async, detail::vector<sink_ptr>& sinks)
     -> logger_sptr {

@@ -1,3 +1,6 @@
+// 默认日志格式化器实现
+// 提供默认的日志格式化功能，包括时间戳、日志级别、线程ID等
+
 export module jt:log.default_formatter;
 
 import std;
@@ -6,6 +9,12 @@ import :log.message;
 
 export namespace jt::log {
 
+/**
+   * 计算时间小数部分
+   * @tparam ToDuration 目标持续时间类型
+   * @param tp 时间点
+   * @return 时间的小数部分（秒以下的部分）
+   */
 template <typename ToDuration>
 ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
   using std::chrono::duration_cast;
@@ -15,8 +24,21 @@ ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
   return duration_cast<ToDuration>(duration) - duration_cast<ToDuration>(secs);
 }
 
+/**
+   * 默认日志格式化器
+   * 实现formatter接口，提供标准的日志格式化输出
+   * 格式: [时间.毫秒] [级别] [{线程ID}] [{服务ID}] [文件:行号] 内容
+   */
 class default_formatter final : public formatter {
  public:
+  /**
+     * 格式化日志消息
+     * @param msg 要格式化的日志消息
+     * @param buf 用于存储格式化结果的缓冲区
+     * @param color_start 颜色开始位置（用于终端着色）
+     * @param color_stop 颜色结束位置（用于终端着色）
+     * @note 此函数参数被标记为NOLINT以避免误报
+     */
   void format(const message& msg, detail::buffer_1k& buf,  // NOLINT
               std::size_t& color_start, std::size_t& color_stop) override {
     // 时间
@@ -57,7 +79,9 @@ class default_formatter final : public formatter {
   }
 
  private:
+  // 用于存储日期和时间的缓冲区
   detail::base_memory_buffer<128> date_and_time_{};
+  // 上次处理的秒数，用于避免重复格式化日期时间
   std::time_t last_second_{0};
 };
 
