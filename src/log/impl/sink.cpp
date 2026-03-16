@@ -74,9 +74,6 @@ class sink_impl {
  private:
   /** 日志级别（使用原子操作以支持线程安全） */
   std::atomic<level> lv_{level::trace};
-  /** 填充字节以确保结构体大小为缓存行的整数倍，避免伪共享 */
-  char padding[detail::cache_line_bytes - sizeof(std::atomic<level>)];
-
   /** 格式化器智能指针 */
   sink::formatter_ptr formatter_;
   /** 互斥锁，用于保护对formatter_的访问 */
