@@ -36,3 +36,4 @@ cmake-build*/
 .cache/
 .idea
 .arts/
+.codeartsdoer/

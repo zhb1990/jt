@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1.2)
+cmake_minimum_required(VERSION 4.3.0)
 
 if(${CMAKE_SIZEOF_VOID_P} MATCHES "4")
     message(FATAL_ERROR "only support x64 toolchain")
