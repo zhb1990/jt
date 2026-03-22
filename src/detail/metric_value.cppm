@@ -86,8 +86,8 @@ class metric_value {
     std::atomic_int64_t value{0};
   };
 
-  std::uint32_t size_{0};      // 槽位数量（通常等于硬件并发线程数）
-  data* datas_{nullptr};       // 动态分配的数据数组
+  std::uint32_t size_{0};  // 槽位数量（通常等于硬件并发线程数）
+  data* datas_{nullptr};   // 动态分配的数据数组
 };
 
 }  // namespace jt::detail

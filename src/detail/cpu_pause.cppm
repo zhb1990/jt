@@ -5,12 +5,12 @@
 
 module;
 
-# if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || \
-     defined(_M_IX86)
-# if defined(_MSC_VER)
-# include <intrin.h>
-# endif
-# endif
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || \
+    defined(_M_IX86)
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+#endif
 
 export module jt:detail.cpu_pause;
 
@@ -28,30 +28,30 @@ export namespace jt::detail {
  *   其他: 空操作
  */
 inline void cpu_pause() noexcept {
-# if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || \
-     defined(_M_IX86)
-# if defined(_MSC_VER)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || \
+    defined(_M_IX86)
+#if defined(_MSC_VER)
   // MSVC内建函数生成PAUSE指令
   _mm_pause();
-# else
+#else
   // GCC/Clang内建函数生成PAUSE指令
   __builtin_ia32_pause();
-# endif
-# elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
-# if (defined(__ARM_ARCH) && __ARM_ARCH >= 7) || defined(__aarch64__)
+#endif
+#elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
+#if (defined(__ARM_ARCH) && __ARM_ARCH >= 7) || defined(__aarch64__)
   // ARMv7及以上: YIELD指令让出执行单元
   asm volatile("yield" ::: "memory");
-# elif defined(_M_ARM64)
+#elif defined(_M_ARM64)
   // MSVC on ARM64: __yield()内建函数
   __yield();
-# else
+#else
   // 较旧ARM架构: NOP指令
   asm volatile("nop" ::: "memory");
-# endif
-# else
+#endif
+#else
   // 其他平台: 空操作
   // empty
-# endif
+#endif
 }
 
 }  // namespace jt::detail

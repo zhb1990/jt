@@ -1,22 +1,22 @@
 module;
- 
+
 #include <cassert>
- 
+
 export module jt:detail.intrusive_mpsc_queue;
- 
+
 import std;
 import :detail.intrusive_queue;
 import :detail.cpu_pause;
- 
+
 export namespace jt::detail {
- 
+
 /**
  * 无锁多生产者单消费者(MPSC)环形队列
  * 实现基于NVIDIA stdexec库的intrusive_mpsc_queue
  */
 template <auto Next>
 class intrusive_mpsc_queue;
- 
+
 /**
  * 无锁多生产者单消费者(MPSC)环形队列
  * 使用intrusive方式存储节点，通过成员指针模板参数配置节点的_next成员
@@ -27,7 +27,7 @@ class intrusive_mpsc_queue<Next> {
   std::atomic<Node*> nil_ = nullptr;
   std::atomic<void*> back_{&nil_};
   void* front_{&nil_};
- 
+
   /**
    * 将nil节点添加到队列尾部
    * 用于pop_front()时队列为空的退化情况处理
@@ -38,7 +38,7 @@ class intrusive_mpsc_queue<Next> {
         static_cast<Node*>(back_.exchange(&nil_, std::memory_order_acq_rel));
     (prev->*Next).store(&nil_, std::memory_order_release);
   }
- 
+
  public:
   /**
    * 将节点添加到队列尾部
@@ -57,7 +57,7 @@ class intrusive_mpsc_queue<Next> {
     }
     return is_nil;
   }
- 
+
   /**
    * 从队列头部取出节点
    * @return 队列头部节点指针，如果队列为空返回nullptr
@@ -86,5 +86,5 @@ class intrusive_mpsc_queue<Next> {
     return front;
   }
 };
- 
+
 }  // namespace jt::detail

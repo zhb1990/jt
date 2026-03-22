@@ -10,11 +10,11 @@ import :log.message;
 export namespace jt::log {
 
 /**
-   * 计算时间小数部分
-   * @tparam ToDuration 目标持续时间类型
-   * @param tp 时间点
-   * @return 时间的小数部分（秒以下的部分）
-   */
+ * 计算时间小数部分
+ * @tparam ToDuration 目标持续时间类型
+ * @param tp 时间点
+ * @return 时间的小数部分（秒以下的部分）
+ */
 template <typename ToDuration>
 ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
   using std::chrono::duration_cast;
@@ -25,20 +25,20 @@ ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
 }
 
 /**
-   * 默认日志格式化器
-   * 实现formatter接口，提供标准的日志格式化输出
-   * 格式: [时间.毫秒] [级别] [{线程ID}] [{服务ID}] [文件:行号] 内容
-   */
+ * 默认日志格式化器
+ * 实现formatter接口，提供标准的日志格式化输出
+ * 格式: [时间.毫秒] [级别] [{线程ID}] [{服务ID}] [文件:行号] 内容
+ */
 class default_formatter final : public formatter {
  public:
   /**
-     * 格式化日志消息
-     * @param msg 要格式化的日志消息
-     * @param buf 用于存储格式化结果的缓冲区
-     * @param color_start 颜色开始位置（用于终端着色）
-     * @param color_stop 颜色结束位置（用于终端着色）
-     * @note 此函数参数被标记为NOLINT以避免误报
-     */
+   * 格式化日志消息
+   * @param msg 要格式化的日志消息
+   * @param buf 用于存储格式化结果的缓冲区
+   * @param color_start 颜色开始位置（用于终端着色）
+   * @param color_stop 颜色结束位置（用于终端着色）
+   * @note 此函数参数被标记为NOLINT以避免误报
+   */
   void format(const message& msg, detail::buffer_1k& buf,  // NOLINT
               std::size_t& color_start, std::size_t& color_stop) override {
     // 时间

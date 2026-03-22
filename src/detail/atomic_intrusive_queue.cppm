@@ -19,7 +19,8 @@ export namespace jt::detail {
 /**
  * 原子侵入式队列模板
  * @tparam Next 节点中指向下一个节点的成员指针
- * @see https://github.com/NVIDIA/stdexec/blob/main/include/stdexec/__detail/__atomic_intrusive_queue.hpp
+ * @see
+ * https://github.com/NVIDIA/stdexec/blob/main/include/stdexec/__detail/__atomic_intrusive_queue.hpp
  */
 template <auto Next>
 class atomic_intrusive_queue;

@@ -4,7 +4,8 @@
  * 通过类的构造函数的std::source_location::current()获取当前代码路径和行号
  * 使用方式: 在代码中创建临时对象即可自动记录日志
  * @note 此类为模板类，构造时即完成日志记录，无需显式调用
- * @note 支持两种形式的日志: 格式化日志(log, critical, error, warn, info, debug, trace)和可变参数日志(vlog, vcritical, verror, vwarn, vinfo, vtrace)
+ * @note 支持两种形式的日志: 格式化日志(log, critical, error, warn, info, debug,
+ * trace)和可变参数日志(vlog, vcritical, verror, vwarn, vinfo, vtrace)
  */
 
 export module jt:log.functions;
