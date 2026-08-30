@@ -474,10 +474,15 @@ class base_memory_buffer : public channel_buffer {
   static_assert(Fixed > 0, "Fixed must > 0");
 
   /**
-   * 构造一个指定前置可写区域大小的缓冲区
-   * @param prependable 前置可写区域大小，默认为0
+   * 构造一个空缓冲区，前置可写区域为 0
    */
-  explicit base_memory_buffer(const std::size_t prependable = 0)
+  base_memory_buffer() : base_memory_buffer(0) {}
+
+  /**
+   * 构造一个指定前置可写区域大小的缓冲区
+   * @param prependable 前置可写区域大小
+   */
+  explicit base_memory_buffer(const std::size_t prependable)
       : channel_buffer(store_, Fixed, prependable), using_heap_(false) {}
 
   /**

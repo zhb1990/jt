@@ -36,7 +36,7 @@ struct message {
   detail::buffer_1k buf;
 
   /** 下一个消息的指针（用于链表或队列） */
-  std::atomic<void*> next{nullptr};
+  std::atomic<message*> next{nullptr};
 };
 
 }  // namespace jt::log
