@@ -70,7 +70,10 @@ class allocator {
    */
   // ReSharper disable once CppMemberFunctionMayBeStatic
   [[nodiscard]] auto allocate(const std::size_t count) -> T* {
-    assert(count <= static_cast<std::size_t>(-1) / sizeof(T));
+    if (count > this->max_size()) {
+      throw std::bad_alloc();
+    }
+
     void* ptr = detail::allocate(sizeof(T) * count);
     return static_cast<T*>(ptr);
   }
@@ -192,8 +195,14 @@ using unique_ptr = std::unique_ptr<T, deleter<T>>;
 template <typename T, typename... Types>
   requires(!std::is_array_v<T>)
 auto make_unique(Types&&... args) -> unique_ptr<T> {
-  auto* ptr = ::new (allocate(sizeof(T))) T(std::forward<Types>(args)...);
-  return unique_ptr<T>(ptr, deleter<T>());
+  auto* mem = allocate(sizeof(T));
+  try {
+    auto* ptr = ::new (mem) T(std::forward<Types>(args)...);
+    return unique_ptr<T>(ptr, deleter<T>());
+  } catch (...) {
+    deallocate(mem);
+    throw;
+  }
 }
 
 /**
@@ -235,9 +244,14 @@ using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
 template <typename Base, typename Derived, typename... Types>
   requires(std::is_base_of_v<Base, Derived>)
 auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
-  auto* ptr =
-      ::new (allocate(sizeof(Derived))) Derived(std::forward<Types>(args)...);
-  return dynamic_unique_ptr<Base>{dynamic_cast<Base*>(ptr), {ptr}};
+  auto* mem = allocate(sizeof(Derived));
+  try {
+    auto* ptr = ::new (mem) Derived(std::forward<Types>(args)...);
+    return dynamic_unique_ptr<Base>{dynamic_cast<Base*>(ptr), {mem}};
+  } catch (...) {
+    deallocate(mem);
+    throw;
+  }
 }
 
 }  // namespace jt::detail

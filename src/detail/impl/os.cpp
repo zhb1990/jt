@@ -110,11 +110,15 @@ class system_error_category : public std::error_category {  // 分类一个通�
     const int len =
         WideCharToMultiByte(CP_UTF8, 0, buffer, static_cast<int>(size), nullptr,
                             0, nullptr, nullptr);
-    if (len <= 0) return "unknown error";
+    if (len <= 0) {
+      LocalFree(buffer);
+      return "unknown error";
+    }
 
     std::string result(len, 0);
     WideCharToMultiByte(CP_UTF8, 0, buffer, static_cast<int>(size),
                         result.data(), len, nullptr, nullptr);
+    LocalFree(buffer);
     return result;
   }
 };
@@ -144,32 +148,28 @@ std::filesystem::path program_location(std::error_code& ec) {
   ec.clear();
 #if defined(_WIN32)
 
-  /**
-   * 获取可执行文件路径所需的缓冲区大小
-   */
   std::ignore = GetLastError();
-  const DWORD len = GetModuleFileNameW(nullptr, nullptr, 0);
+  constexpr DWORD default_path_size = 256;
+  WCHAR temp[default_path_size]{};
+  GetModuleFileNameW(nullptr, temp, default_path_size);
   auto err = GetLastError();
-  if (err != ERROR_SUCCESS) {
-    ec.assign(static_cast<int>(err), system_category());
-    return {};
+  if (err == ERROR_SUCCESS) {
+    return std::filesystem::canonical(temp, ec);
   }
 
-  /**
-   * 获取可执行文件路径
-   */
-  std::wstring p(len, L'\0');
-  GetModuleFileNameW(nullptr, p.data(), len);
-  err = GetLastError();
-  if (err != ERROR_SUCCESS) {
-    ec.assign(static_cast<int>(err), system_category());
-    return {};
+  for (unsigned i = 2; i < 1025 && err == ERROR_INSUFFICIENT_BUFFER; i *= 2) {
+    const auto size = default_path_size * i;
+    std::wstring p(size, L'\0');
+    const size_t len = GetModuleFileNameW(nullptr, p.data(), size);
+    err = GetLastError();
+    if (err == ERROR_SUCCESS) {
+      p.resize(len);
+      return std::filesystem::canonical(p, ec);
+    }
   }
 
-  /**
-   * 返回规范化路径
-   */
-  return std::filesystem::canonical(p.data(), ec);
+  ec.assign(static_cast<int>(err), system_category());
+  return {};
 #elif defined(macintosh) || defined(Macintosh) || \
     (defined(__APPLE__) && defined(__MACH__))
   /**

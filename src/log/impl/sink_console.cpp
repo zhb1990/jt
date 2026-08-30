@@ -78,7 +78,9 @@ class sink_console_impl {
   explicit sink_console_impl(const DWORD handle) {
     handle_ = GetStdHandle(handle);
     DWORD mode;
-    enable_color_ = GetConsoleMode(handle_, &mode) != 0;
+    is_console_ = (handle_ != nullptr) && (handle_ != INVALID_HANDLE_VALUE) &&
+                  (GetConsoleMode(handle_, &mode) != 0);
+    enable_color_ = is_console_;
   }
 #else
   /**
@@ -134,15 +136,33 @@ class sink_console_impl {
 #ifdef _WIN32
     auto* ptr = reinterpret_cast<const char*>(buf.begin_read()) + start;
     const int str_len = static_cast<int>(end - start);
-    const auto len = MultiByteToWideChar(CP_UTF8, 0, ptr, str_len, nullptr, 0);
-    if (len <= 0) return;
+    if (str_len <= 0) {
+      return;
+    }
 
-    std::wstring temp(len, 0);
-    MultiByteToWideChar(CP_UTF8, 0, ptr, str_len, temp.data(),
-                        static_cast<int>(temp.size()));
-    DWORD written;
-    WriteConsoleW(handle_, temp.c_str(), static_cast<DWORD>(temp.size()),
-                  &written, nullptr);
+    if (is_console_) {
+      const auto len =
+          MultiByteToWideChar(CP_UTF8, 0, ptr, str_len, nullptr, 0);
+      if (len <= 0) return;
+
+      std::wstring temp(len, 0);
+      MultiByteToWideChar(CP_UTF8, 0, ptr, str_len, temp.data(),
+                          static_cast<int>(temp.size()));
+      DWORD written;
+      WriteConsoleW(handle_, temp.c_str(), static_cast<DWORD>(temp.size()),
+                    &written, nullptr);
+    } else {
+      DWORD nbytes = static_cast<DWORD>(str_len);
+      DWORD written = 0;
+      while (written < nbytes) {
+        DWORD n = 0;
+        if (!WriteFile(handle_, ptr + written, nbytes - written, &n, nullptr) ||
+            n == 0) {
+          break;
+        }
+        written += n;
+      }
+    }
 #else
     std::fwrite(buf.begin_read() + start, sizeof(char), end - start, handle_);
 #endif
@@ -239,6 +259,7 @@ class sink_console_impl {
   HANDLE handle_{INVALID_HANDLE_VALUE};
   /** 原始控制台属性 */
   WORD old_attribs_{0};
+  bool is_console_{false};
 #else
   /** 文件句柄（stdout或stderr） */
   std::FILE* handle_{nullptr};

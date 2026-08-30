@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 4.3.0)
 
-if(${CMAKE_SIZEOF_VOID_P} MATCHES "4")
-    message(FATAL_ERROR "only support x64 toolchain")
-endif()
-
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "f35a9ac6-8463-4d38-8eec-5d6008153e7d")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_MODULE_STD ON)
@@ -34,6 +30,10 @@ if(WIN32)
 endif()
 
 project(jt)
+
+if(${CMAKE_SIZEOF_VOID_P} MATCHES "4")
+    message(FATAL_ERROR "only support x64 toolchain")
+endif()
 
 find_package(lz4 CONFIG REQUIRED)
 if(NOT lz4_FOUND)

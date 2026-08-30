@@ -523,7 +523,6 @@ class base_memory_buffer : public channel_buffer {
       other.data_ = other.store_;
       other.using_heap_ = false;
       other.capacity_ = Fixed;
-
     } else {
       std::memcpy(store_, other.store_, other.write_);
       data_ = store_;
@@ -541,14 +540,17 @@ class base_memory_buffer : public channel_buffer {
    * 从只读缓冲区构造
    * @param buf 只读缓冲区
    */
-  explicit base_memory_buffer(const read_buffer& buf) { append(buf); }
+  explicit base_memory_buffer(const read_buffer& buf) : base_memory_buffer(0) {
+    append(buf);
+  }
 
   /**
    * 从内存区域构造
    * @param ptr 数据指针
    * @param len 数据长度
    */
-  base_memory_buffer(const void* ptr, const std::size_t len) {
+  base_memory_buffer(const void* ptr, const std::size_t len)
+      : base_memory_buffer(0) {
     append(ptr, len);
   }
 
@@ -737,10 +739,10 @@ class base_memory_buffer : public channel_buffer {
     }
 
     auto* old_data = data_;
-    const auto old_capacity = capacity_;
-
     void* new_data = allocate(new_capacity);
-    std::memcpy(new_data, old_data, write_);
+    if (write_ > 0) {
+      std::memcpy(new_data, old_data, write_);
+    }
     if (using_heap_) {
       deallocate(old_data);
     }

@@ -250,7 +250,6 @@ class intrusive_queue<Next> {
     friend auto operator==(const iterator&, const iterator&) noexcept
         -> bool = default;
 
-   protected:
     Node* predecessor_ = nullptr;
     Node* node_ = nullptr;
   };
@@ -288,24 +287,29 @@ class intrusive_queue<Next> {
 
     assert(first.node_ != nullptr);
     assert(last.predecessor_ != nullptr);
-    if (other.head_ == first.node_) {
+
+    if (first.predecessor_ == nullptr) {
       other.head_ = last.node_;
       if (other.head_ == nullptr) {
         other.tail_ = nullptr;
       }
     } else {
-      assert(first.predecessor_ != nullptr);
       first.predecessor_->*Next = last.node_;
-      last.predecessor_->*Next = pos.node_;
+      if (last.node_ == nullptr) {
+        other.tail_ = first.predecessor_;
+      }
     }
-    if (empty()) {
+
+    last.predecessor_->*Next = pos.node_;
+
+    if (pos.predecessor_ == nullptr) {
       head_ = first.node_;
-      tail_ = last.predecessor_;
     } else {
       pos.predecessor_->*Next = first.node_;
-      if (pos.node_ == nullptr) {
-        tail_ = last.predecessor_;
-      }
+    }
+
+    if (pos.node_ == nullptr) {
+      tail_ = last.predecessor_;
     }
   }
 

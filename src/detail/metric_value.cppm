@@ -17,6 +17,9 @@ class metric_value {
    * 根据硬件并发线程数分配存储空间
    */
   metric_value() : size_(std::thread::hardware_concurrency()) {
+    if (size_ == 0) {
+      size_ = 1;  // 如果无法获取硬件并发线程数，则至少分配一个槽位
+    }
     datas_ = new data[size_];
   }
 

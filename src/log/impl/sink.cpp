@@ -2,7 +2,6 @@
 module jt;
 
 import std;
-import :detail.cache_line;
 import :log.message;
 import :log.default_formatter;
 
