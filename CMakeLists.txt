@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 4.1.2)
+cmake_minimum_required(VERSION 4.3.0)
 
 if(${CMAKE_SIZEOF_VOID_P} MATCHES "4")
     message(FATAL_ERROR "only support x64 toolchain")
 endif()
 
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_MODULE_STD ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -45,9 +45,14 @@ if(NOT asio_FOUND)
     message(WARNING "asio not found.")
 endif()
 
-find_package(simdjson CONFIG REQUIRED)
-if(NOT simdjson_FOUND)
-    message(WARNING "simdjson not found.")
+find_package(RapidJSON CONFIG REQUIRED)
+if(NOT RapidJSON_FOUND)
+    message(WARNING "RapidJSON not found.")
+endif()
+
+find_package(mimalloc CONFIG REQUIRED)
+if(NOT mimalloc_FOUND)
+    message(WARNING "mimalloc not found.")
 endif()
 
 set(JT_MODULES
@@ -97,7 +102,11 @@ set(JT_SOURCES
 )
 
 add_library(libjt SHARED)
-target_link_libraries(libjt PRIVATE simdjson::simdjson lz4::lz4)
+target_link_libraries(libjt PRIVATE
+        $<IF:$<TARGET_EXISTS:mimalloc-static>,mimalloc-static,mimalloc>
+        RapidJSON
+        lz4::lz4
+)
 set_target_properties(libjt PROPERTIES PREFIX "")
 if(APPLE)
     target_link_directories(libjt PUBLIC ${CMAKE_LLVM_PREFIX}/lib/c++)
