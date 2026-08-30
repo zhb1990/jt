@@ -241,17 +241,9 @@ class service_impl {
    * 停止日志服务
    */
   void stop() {
-    {
-      std::scoped_lock lock{writer_mutex_};
-      writer_stop_requested_ = true;
-      writer_cv_.notify_one();
-    }
-
-    {
-      std::scoped_lock lock{lz4_mutex_};
-      lz4_stop_requested_ = true;
-      lz4_cv_.notify_one();
-    }
+    std::scoped_lock lock{writer_mutex_};
+    writer_stop_requested_.store(true, std::memory_order::relaxed);
+    writer_cv_.notify_one();
   }
 
   /**
@@ -469,6 +461,12 @@ class service_impl {
         }
 
         writer_do_message();
+
+        {
+          std::scoped_lock lock{lz4_mutex_};
+          lz4_stop_requested_ = true;
+          lz4_cv_.notify_one();
+        }
         break;
       }
     }
