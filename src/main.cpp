@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
 
     // 使用变量参数记录警告日志（中文）
     jt::log::vwarn(log1, "使用的内存 {}", jt::detail::allocated_memory());
-    service.stop();
+    service.request_stop();
     std::println("mem {}", jt::detail::allocated_memory());
   }
   std::println("mem {}", jt::detail::allocated_memory());

@@ -58,10 +58,10 @@ class service {
   JT_API void clear();
 
   /**
-   * 停止日志服务
+   * 请求停止日志服务
    * 停止后台写入和压缩线程
    */
-  JT_API void stop();
+  JT_API void request_stop();
 
   /**
    * 获取默认日志记录器

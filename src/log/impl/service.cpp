@@ -168,7 +168,7 @@ class service_impl {
     try {
       lz4_thread_ = std::thread{[this]() { return lz4_run(); }};
     } catch (...) {
-      stop();
+      request_stop();
       if (writer_thread_.joinable()) {
         writer_thread_.join();
       }
@@ -177,7 +177,7 @@ class service_impl {
   }
 
   ~service_impl() {
-    stop();
+    request_stop();
     if (writer_thread_.joinable()) {
       writer_thread_.join();
     }
@@ -238,9 +238,9 @@ class service_impl {
   }
 
   /**
-   * 停止日志服务
+   * 请求停止日志服务
    */
-  void stop() {
+  void request_stop() {
     std::scoped_lock lock{writer_mutex_};
     writer_stop_requested_.store(true, std::memory_order::relaxed);
     writer_cv_.notify_one();
@@ -632,7 +632,7 @@ void service::erase(const std::string_view name) { return impl_->erase(name); }
 void service::clear() { return impl_->clear(); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-void service::stop() { return impl_->stop(); }
+void service::request_stop() { return impl_->request_stop(); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 auto service::get_default() -> logger_sptr { return impl_->get_default(); }
