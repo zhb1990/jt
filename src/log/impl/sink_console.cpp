@@ -330,7 +330,7 @@ void write_stdout(const detail::buffer_1k& buf) {
  * @param buf 要输出的数据缓冲区
  */
 void write_stderr(const detail::buffer_1k& buf) {
-  console_stdout.write(level::error, buf, 0, buf.readable());
+  console_stderr.write(level::error, buf, 0, buf.readable());
 }
 
 }  // namespace jt::log

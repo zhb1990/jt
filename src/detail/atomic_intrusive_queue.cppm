@@ -37,7 +37,7 @@ class alignas(cache_line_bytes) atomic_intrusive_queue<Next> {
   /**
    * 将节点推入队列
    * @param node 要推入的节点指针
-   * @return 如果队列之前为空则返回false，否则返回true
+   * @return 如果队列之前为空则返回true，否则返回false
    * @note 使用内存顺序acq_rel确保正确的同步
    */
   auto push(Node* node) noexcept -> bool {
@@ -47,7 +47,7 @@ class alignas(cache_line_bytes) atomic_intrusive_queue<Next> {
       node->*Next = old_head;
     } while (!head_.compare_exchange_weak(old_head, node,
                                           std::memory_order_acq_rel));
-    if (!old_head) {
+    if (old_head) {
       return false;
     }
 

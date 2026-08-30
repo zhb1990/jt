@@ -58,12 +58,6 @@ class service {
   JT_API void clear();
 
   /**
-   * 启动日志服务
-   * 启动后台写入和压缩线程
-   */
-  JT_API void start();
-
-  /**
    * 停止日志服务
    * 停止后台写入和压缩线程
    */

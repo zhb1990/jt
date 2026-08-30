@@ -2,6 +2,8 @@ module;
 
 #include <lz4frame.h>
 
+#include <atomic>
+
 // module jt:log.service;
 module jt;
 
@@ -161,7 +163,28 @@ class service_impl {
   using logger_sptr = std::shared_ptr<logger>;
   using logger_wptr = std::weak_ptr<logger>;
 
-  ~service_impl() { stop(); }
+  service_impl() {
+    writer_thread_ = std::thread{[this]() { return writer_run(); }};
+    try {
+      lz4_thread_ = std::thread{[this]() { return lz4_run(); }};
+    } catch (...) {
+      stop();
+      if (writer_thread_.joinable()) {
+        writer_thread_.join();
+      }
+      throw;
+    }
+  }
+
+  ~service_impl() {
+    stop();
+    if (writer_thread_.joinable()) {
+      writer_thread_.join();
+    }
+    if (lz4_thread_.joinable()) {
+      lz4_thread_.join();
+    }
+  }
 
   /**
    * 注册日志记录器
@@ -215,18 +238,6 @@ class service_impl {
   }
 
   /**
-   * 启动日志服务
-   * @note 此函数被标记为NOLINT以避免误报
-   */
-  void start() {  // NOLINT(*-convert-member-functions-to-static)
-    if (writer_thread_.joinable() || lz4_thread_.joinable()) return;
-
-    writer_thread_ = std::thread{[this]() { return writer_run(); }};
-
-    lz4_thread_ = std::thread{[this]() { return lz4_run(); }};
-  }
-
-  /**
    * 停止日志服务
    */
   void stop() {
@@ -235,17 +246,11 @@ class service_impl {
       writer_stop_requested_ = true;
       writer_cv_.notify_one();
     }
-    if (writer_thread_.joinable()) {
-      writer_thread_.join();
-    }
 
     {
       std::scoped_lock lock{lz4_mutex_};
       lz4_stop_requested_ = true;
       lz4_cv_.notify_one();
-    }
-    if (lz4_thread_.joinable()) {
-      lz4_thread_.join();
     }
   }
 
@@ -282,8 +287,11 @@ class service_impl {
    * @param ptr 要刷新的日志记录器弱指针
    */
   void flush(const logger_wptr& ptr) {
-    message* msg = message_allocator_.allocate(1);
-    message_allocator_.construct(msg);
+    message* msg = new_log_message();
+    if (!msg) {
+      return;
+    }
+
     msg->logger = ptr;
     msg->type = message_type::flush;
     return push_log_message(msg);
@@ -299,8 +307,11 @@ class service_impl {
    */
   void log(const logger_wptr& ptr, const std::uint32_t sid, const level lv,
            detail::buffer_1k& buf, const std::source_location& source) {
-    message* msg = message_allocator_.allocate(1);
-    message_allocator_.construct(msg);
+    message* msg = new_log_message();
+    if (!msg) {
+      return;
+    }
+
     msg->logger = ptr;
     msg->type = message_type::log;
     msg->buf = std::move(buf);
@@ -348,6 +359,7 @@ class service_impl {
 
  private:
   struct lz4_message;
+
   /**
    * 推送LZ4消息到队列
    * @param msg 要推送的LZ4消息
@@ -362,6 +374,29 @@ class service_impl {
   }
 
   /**
+   * 创建新的日志消息
+   * @return 新的日志消息指针
+   */
+  message* new_log_message() {
+    if (writer_stop_requested_.load(std::memory_order_relaxed)) {
+      return nullptr;
+    }
+
+    message* msg = message_allocator_.allocate(1);
+    message_allocator_.construct(msg);
+    return msg;
+  }
+
+  /**
+   * 删除日志消息
+   * @param msg 要删除的日志消息指针
+   */
+  void delete_log_message(message* msg) {
+    message_allocator_.destroy(msg);
+    message_allocator_.deallocate(msg, 1);
+  }
+
+  /**
    * 推送日志消息到队列
    * @param msg 要推送的日志消息指针
    */
@@ -369,10 +404,8 @@ class service_impl {
     std::ptrdiff_t n =
         writer_submission_counter_.fetch_add(1, std::memory_order::relaxed);
     if (n < 0) {
-      message_allocator_.destroy(msg);
-      message_allocator_.deallocate(msg, 1);
-      writer_submission_counter_.compare_exchange_strong(
-          n, thread_closed, std::memory_order::relaxed);
+      delete_log_message(msg);
+      writer_submission_counter_.fetch_sub(1, std::memory_order::relaxed);
       return;
     }
 
@@ -381,27 +414,33 @@ class service_impl {
       writer_ready_ = true;
       writer_cv_.notify_one();
     }
-    writer_submission_counter_.fetch_sub(1, std::memory_order::relaxed);
+    writer_submission_counter_.fetch_sub(1, std::memory_order::release);
   }
 
   /**
    * 处理日志消息
    */
   inline void writer_do_message() {
-    // ReSharper disable once CppDFAUnreachableCode
-    // ReSharper disable once CppDFAEndlessLoop
-    while (message* msg = writer_queue_.pop_front()) {
+    message* msg = nullptr;
+    bool is_empty = false;
+    std::tie(msg, is_empty) = writer_queue_.pop_front();
+    while (!is_empty) {
       // ReSharper disable once CppDFAEndlessLoop
-      if (const auto ptr = msg->logger.lock()) {
-        if (msg->type == message_type::log) {
-          ptr->backend_log(*msg);
-        } else {
-          ptr->backend_flush();
+      if (msg) {
+        if (const auto ptr = msg->logger.lock()) {
+          if (msg->type == message_type::log) {
+            ptr->backend_log(*msg);
+          } else {
+            ptr->backend_flush();
+          }
         }
+
+        delete_log_message(msg);
+      } else {
+        detail::cpu_pause();
       }
 
-      message_allocator_.destroy(msg);
-      message_allocator_.deallocate(msg, 1);
+      std::tie(msg, is_empty) = writer_queue_.pop_front();
     }
   }
 
@@ -423,7 +462,8 @@ class service_impl {
       if (stop_requested) {
         std::ptrdiff_t expected = 0;
         while (!writer_submission_counter_.compare_exchange_weak(
-            expected, thread_closed, std::memory_order::relaxed)) {
+            expected, thread_closed, std::memory_order::acquire,
+            std::memory_order::relaxed)) {
           detail::cpu_pause();
           expected = 0;
         }
@@ -573,7 +613,7 @@ class service_impl {
 
   bool lz4_stop_requested_{false};
   bool writer_ready_{false};
-  bool writer_stop_requested_{false};
+  std::atomic_bool writer_stop_requested_{false};
   std::atomic<std::ptrdiff_t> writer_submission_counter_{0};
   detail::allocator<message> message_allocator_{};
 };
@@ -592,9 +632,6 @@ void service::erase(const std::string_view name) { return impl_->erase(name); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void service::clear() { return impl_->clear(); }
-
-// ReSharper disable once CppMemberFunctionMayBeConst
-void service::start() { return impl_->start(); }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void service::stop() { return impl_->stop(); }

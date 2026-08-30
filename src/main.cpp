@@ -28,7 +28,6 @@ int main(int argc, char** argv) {
 
     // 创建日志服务
     jt::log::service service;
-    service.start();
 
     // 创建两个Sink：文件Sink和标准输出Sink
     std::array a1{

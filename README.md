@@ -150,7 +150,6 @@ import jt;
 
 // 创建日志服务
 jt::log::service service;
-service.start();
 
 // 配置文件日志
 jt::log::sink_file_config config;

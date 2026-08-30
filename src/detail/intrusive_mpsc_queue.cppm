@@ -49,16 +49,16 @@ class intrusive_mpsc_queue<Next> {
 
   /**
    * 从队列头部取出节点
-   * @return 队列头部节点指针，如果队列为空或生产者正在插入则返回 nullptr
+   * @return 返回一个 pair，包含取出的节点指针和一个布尔值，表示队列是否为空
    */
-  auto pop_front() noexcept -> Node* {
+  auto pop_front() noexcept -> std::pair<Node*, bool> {
     Node* tail = this->tail_;
     assert(tail != nullptr);
     Node* next = (tail->*Next).load(std::memory_order_acquire);
     // 若 tail 指向 stub 节点，需要再前进一次
     if (&stub_ == tail) {
       if (nullptr == next) {
-        return nullptr;
+        return {nullptr, true};
       }
       this->tail_ = next;
       tail = next;
@@ -67,7 +67,7 @@ class intrusive_mpsc_queue<Next> {
     // 常见情况：存在下一个节点，直接前进 tail
     if (nullptr != next) {
       this->tail_ = next;
-      return tail;
+      return {tail, false};
     }
     // next 为 nullptr 表示：
     // 1) 队列中没有更多节点
@@ -75,7 +75,7 @@ class intrusive_mpsc_queue<Next> {
     Node const* head = this->head_.load(std::memory_order_acquire);
     // 生产者正在插入新节点，此时不能返回 tail，因为还无法链接下一个节点
     if (tail != head) {
-      return nullptr;
+      return {nullptr, false};
     }
     // 队列已空，插入 stub 以便链接到空状态（或后续新节点）
     push_back(&stub_);
@@ -84,10 +84,10 @@ class intrusive_mpsc_queue<Next> {
     if (nullptr != next) {
       // 已成功链接新节点或 stub 节点
       this->tail_ = next;
-      return tail;
+      return {tail, false};
     }
     // next 仍为 nullptr 且不是 stub，说明生产者正在插入新节点，尚无法链接
-    return nullptr;
+    return {nullptr, false};
   }
 };
 
