@@ -252,12 +252,7 @@ class service_impl {
    * @note 此函数被标记为NOLINT以避免误报
    */
   auto get_default() -> logger_sptr {  // NOLINT
-#if defined(__clang__)
-    std::scoped_lock lock{loggers_mutex_};
-    return default_logger_;
-#else
-    return default_logger_.load(std::memory_order::relaxed);
-#endif
+    return default_logger_.load(std::memory_order::acquire);
   }
 
   /**
@@ -266,12 +261,7 @@ class service_impl {
    * @note 此函数参数被标记为NOLINT以避免误报
    */
   void set_default(const logger_sptr& ptr) {  // NOLINT
-#if defined(__clang__)
-    std::scoped_lock lock{loggers_mutex_};
-    default_logger_ = ptr;
-#else
-    default_logger_.store(ptr, std::memory_order::relaxed);
-#endif
+    default_logger_.store(ptr, std::memory_order::release);
   }
 
   /**
@@ -592,11 +582,7 @@ class service_impl {
 
   std::mutex loggers_mutex_{};
   detail::unordered_map<std::string_view, logger_sptr> loggers_{};
-#if defined(__clang__)
-  logger_sptr default_logger_{};
-#else
   std::atomic<logger_sptr> default_logger_{};
-#endif
 
   std::thread writer_thread_{};
   std::mutex writer_mutex_{};
