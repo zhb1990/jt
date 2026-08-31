@@ -245,7 +245,7 @@ using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
  * @return 管理新创建对象的dynamic_unique_ptr
  */
 template <typename Base, typename Derived, typename... Types>
-  requires(std::is_base_of_v<Base, Derived>&&
+  requires(std::is_base_of_v<Base, Derived> &&
            std::has_virtual_destructor_v<Base>)
 auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
   auto* mem = allocate(sizeof(Derived));
