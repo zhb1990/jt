@@ -43,7 +43,7 @@ class sink_impl {
     }
 
     detail::buffer_1k buf;
-    std::size_t color_start, color_stop;
+    std::size_t color_start = 0, color_stop = 0;
     std::lock_guard lock(mtx_);
     // 使用格式化器格式化日志消息
     formatter_->format(msg, buf, color_start, color_stop);
