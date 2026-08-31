@@ -15,24 +15,23 @@ import :log.logger;
 namespace jt::log {
 
 template <typename Format>
-void write_log(std::uint32_t sid, const std::shared_ptr<logger>& logger_ptr,
-               level lv, const std::source_location& source, Format&& format) {
-  if (!logger_ptr->should_log(lv)) return;
+void write_log(std::uint32_t sid, logger& dest, level lv,
+               const std::source_location& source, Format&& format) {
+  if (!dest.should_log(lv)) return;
 
   try {
     detail::buffer_1k buf;
     std::forward<Format>(format)(std::back_inserter(buf));
-    logger_ptr->log(sid, lv, buf, source);
+    dest.log(sid, lv, buf, source);
   } catch (...) {
   }
 }
 
 template <level Lv, typename... Args>
 struct log {
-  log(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-      Args&&... args,
+  log(logger& dest, std::format_string<Args...> fmt, Args&&... args,
       const std::source_location& source = std::source_location::current()) {
-    write_log(0, logger, Lv, source, [&](auto&& out) {
+    write_log(0, dest, Lv, source, [&](auto&& out) {
       std::format_to(out, fmt, std::forward<Args>(args)...);
     });
   }
@@ -40,10 +39,9 @@ struct log {
 
 template <level Lv, typename... Args>
 struct vlog {
-  vlog(const std::shared_ptr<logger>& logger, std::string_view fmt,
-       Args&&... args,
+  vlog(logger& dest, std::string_view fmt, Args&&... args,
        const std::source_location& source = std::source_location::current()) {
-    write_log(0, logger, Lv, source, [&](auto&& out) {
+    write_log(0, dest, Lv, source, [&](auto&& out) {
       std::vformat_to(out, fmt, std::make_format_args(args...));
     });
   }
@@ -66,12 +64,12 @@ struct vcritical : vlog<level::critical, Args...> {
 };
 
 template <typename... Args>
-critical(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-         Args&&... args) -> critical<Args...>;
+critical(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> critical<Args...>;
 
 template <typename... Args>
-vcritical(const std::shared_ptr<logger>& logger, std::string_view fmt,
-          Args&&... args) -> vcritical<Args...>;
+vcritical(logger& dest, std::string_view fmt, Args&&... args)
+    -> vcritical<Args...>;
 
 template <typename... Args>
 struct error : log<level::error, Args...> {
@@ -86,12 +84,11 @@ struct verror : vlog<level::error, Args...> {
 };
 
 template <typename... Args>
-error(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-      Args&&... args) -> error<Args...>;
+error(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> error<Args...>;
 
 template <typename... Args>
-verror(const std::shared_ptr<logger>& logger, std::string_view fmt,
-       Args&&... args) -> verror<Args...>;
+verror(logger& dest, std::string_view fmt, Args&&... args) -> verror<Args...>;
 
 template <typename... Args>
 struct warn : log<level::warn, Args...> {
@@ -106,12 +103,11 @@ struct vwarn : vlog<level::warn, Args...> {
 };
 
 template <typename... Args>
-warn(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-     Args&&... args) -> warn<Args...>;
+warn(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> warn<Args...>;
 
 template <typename... Args>
-vwarn(const std::shared_ptr<logger>& logger, std::string_view fmt,
-      Args&&... args) -> vwarn<Args...>;
+vwarn(logger& dest, std::string_view fmt, Args&&... args) -> vwarn<Args...>;
 
 template <typename... Args>
 struct info : log<level::info, Args...> {
@@ -126,12 +122,11 @@ struct vinfo : vlog<level::info, Args...> {
 };
 
 template <typename... Args>
-info(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-     Args&&... args) -> info<Args...>;
+info(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> info<Args...>;
 
 template <typename... Args>
-vinfo(const std::shared_ptr<logger>& logger, std::string_view fmt,
-      Args&&... args) -> vinfo<Args...>;
+vinfo(logger& dest, std::string_view fmt, Args&&... args) -> vinfo<Args...>;
 
 template <typename... Args>
 struct debug : log<level::debug, Args...> {
@@ -146,12 +141,11 @@ struct vdebug : vlog<level::debug, Args...> {
 };
 
 template <typename... Args>
-debug(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-      Args&&... args) -> debug<Args...>;
+debug(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> debug<Args...>;
 
 template <typename... Args>
-vdebug(const std::shared_ptr<logger>& logger, std::string_view fmt,
-       Args&&... args) -> vdebug<Args...>;
+vdebug(logger& dest, std::string_view fmt, Args&&... args) -> vdebug<Args...>;
 
 template <typename... Args>
 struct trace : log<level::trace, Args...> {
@@ -166,11 +160,10 @@ struct vtrace : vlog<level::trace, Args...> {
 };
 
 template <typename... Args>
-trace(const std::shared_ptr<logger>& logger, std::format_string<Args...> fmt,
-      Args&&... args) -> trace<Args...>;
+trace(logger& dest, std::format_string<Args...> fmt, Args&&... args)
+    -> trace<Args...>;
 
 template <typename... Args>
-vtrace(const std::shared_ptr<logger>& logger, std::string_view fmt,
-       Args&&... args) -> vtrace<Args...>;
+vtrace(logger& dest, std::string_view fmt, Args&&... args) -> vtrace<Args...>;
 
 }  // namespace jt::log
