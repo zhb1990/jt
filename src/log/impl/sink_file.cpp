@@ -6,6 +6,7 @@ module;
 module jt;
 
 import std;
+import :log.service_impl;
 
 namespace jt::log {
 
@@ -17,11 +18,11 @@ class sink_file_imp {
  public:
   /**
    * 构造函数
-   * @param service 日志服务引用
+   * @param s 日志服务引用
    * @param config 文件日志配置
    */
-  explicit sink_file_imp(service& s, const sink_file_config& config)  // NOLINT
-      : service_(s),
+  explicit sink_file_imp(service& s, const sink_file_config& config)
+      : service_(s.get_impl()),
         max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
@@ -72,7 +73,9 @@ class sink_file_imp {
 
       // 清理过期的压缩日志文件
       if (keep_days_ > 0 && old_day > 0) {
-        service_.clear_lz4(name_, lz4_directory_, keep_days_);
+        if (auto s = service_.lock()) {
+          s->clear_lz4(name_, lz4_directory_, keep_days_);
+        }
       }
     }
 
@@ -177,7 +180,9 @@ class sink_file_imp {
       file_.close();
       file_size_ = 0;
       // 触发当前日志文件的LZ4压缩
-      service_.post_lz4(file_name_, lz4_directory_);
+      if (auto s = service_.lock()) {
+        s->post_lz4(file_name_, lz4_directory_);
+      }
     }
 
     // 计算今天的日期（用于命名新日志文件）
@@ -230,7 +235,7 @@ class sink_file_imp {
   }
 
   // 服务引用
-  service& service_;
+  std::weak_ptr<service_impl> service_;
   // 日志文件基础名称
   detail::string name_{};
   // 日志文件目录
@@ -266,7 +271,7 @@ class sink_file_imp {
  * 文件日志Sink的包装类
  * 通过PIMPL idiom隐藏实现细节
  */
-sink_file::sink_file(service& s, const sink_file_config& config)  // NOLINT
+sink_file::sink_file(service& s, const sink_file_config& config)
     : impl_(detail::make_unique<sink_file_imp>(s, config)) {}
 
 sink_file::~sink_file() noexcept = default;

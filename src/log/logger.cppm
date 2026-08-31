@@ -1,5 +1,6 @@
 module;
 
+#include <memory>
 #include "../detail/config.h"
 
 export module jt:log.logger;
@@ -37,7 +38,7 @@ class logger : public std::enable_shared_from_this<logger> {
    * @param sinks Sink集合
    * @param async 是否异步模式
    */
-  logger(service& service, const std::string_view& name,
+  logger(std::shared_ptr<service_impl>& service, const std::string_view& name,
          detail::vector<sink_ptr> sinks, bool async);
 
   /**

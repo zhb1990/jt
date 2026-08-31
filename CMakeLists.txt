@@ -70,6 +70,7 @@ set(JT_MODULES
     "src/log/sink_console.cppm"
     "src/log/sink_file.cppm"
     "src/log/functions.cppm"
+    "src/log/impl/service_impl.cppm"
 )
 
 set(JT_HEADERS "src/detail/config.h")
@@ -84,6 +85,7 @@ set(JT_SOURCES
     "src/log/impl/sink.cpp"
     "src/log/impl/sink_console.cpp"
     "src/log/impl/sink_file.cpp"
+    "src/log/impl/service_impl.cpp"
 )
 
 add_library(libjt SHARED)

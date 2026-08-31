@@ -136,9 +136,11 @@ class service {
   void clear_lz4(const detail::string& name, std::string_view lz4_directory,
                  std::uint32_t keep_days);
 
+  auto get_impl() -> std::shared_ptr<service_impl>;
+
  private:
   /** Pimpl idiom实现指针 */
-  detail::unique_ptr<service_impl> impl_;
+  std::shared_ptr<service_impl> impl_;
 };
 
 }  // namespace jt::log
