@@ -58,11 +58,14 @@ class sink_file_imp {
    * @param buf 日志缓冲区
    */
   void write(const sink::time_point& point, const detail::buffer_1k& buf) {
+    auto zone = std::chrono::current_zone();
+    auto local_point = zone->to_local(point);
+
     // 检查是否需要进行日志轮换（基于时间或文件大小）
-    if (tomorrow_ < point) {
+    if (tomorrow_ < local_point) {
       const auto old_day = manifest_.day;
-      tomorrow_ =
-          std::chrono::floor<std::chrono::days>(point) + std::chrono::days(1);
+      tomorrow_ = std::chrono::floor<std::chrono::days>(local_point) +
+                  std::chrono::days(1);
       if (daily_rotation_ || manifest_.day == 0) {
         rotate();  // 执行日志轮换
       }
@@ -142,9 +145,9 @@ class sink_file_imp {
     const int year = static_cast<int>(day / 10000);
     const int month = static_cast<int>(day % 10000) / 100;
     const int m_day = static_cast<int>(day % 100);
-    tomorrow_ = std::chrono::year_month_day(std::chrono::year(year),
-                                            std::chrono::month(month),
-                                            std::chrono::day(m_day));
+    tomorrow_ = std::chrono::local_days{std::chrono::year(year) /
+                                        std::chrono::month(month) /
+                                        std::chrono::day(m_day)};
     tomorrow_ += std::chrono::days{1};
 
     // 确保文件已打开以便追加写入
@@ -256,7 +259,7 @@ class sink_file_imp {
   std::ofstream file_;                   // 日志文件流
   std::filesystem::path file_name_;      // 当前日志文件路径
   std::size_t file_size_{0};             // 当前日志文件大小
-  std::chrono::sys_days tomorrow_{};     // 明天的日期（用于判断是否需要轮换）
+  std::chrono::local_days tomorrow_{};   // 明天的日期（用于判断是否需要轮换）
 };
 
 /**

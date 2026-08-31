@@ -47,14 +47,20 @@ class default_formatter final : public formatter {
         current_second != last_second_) {
       last_second_ = current_second;
       date_and_time_.clear();
+      const auto local_time = std::chrono::zoned_time{
+          std::chrono::current_zone(),
+          std::chrono::floor<std::chrono::seconds>(msg.point)};
       std::format_to(std::back_inserter(date_and_time_), "{:%Y-%m-%d %H:%M:%S}",
-                     std::chrono::floor<std::chrono::seconds>(msg.point));
+                     local_time);
+      zone_offset_.clear();
+      std::format_to(std::back_inserter(zone_offset_), "{:%Ez}", local_time);
     }
 
     const auto millis = time_fraction<milliseconds>(msg.point);
     std::string_view time_view(date_and_time_);
-    std::format_to(std::back_inserter(buf), "[{}.{:03}] [", time_view,
-                   millis.count());
+    std::string_view zone_offset_view(zone_offset_);
+    std::format_to(std::back_inserter(buf), "[{}.{:03} {}] [", time_view,
+                   millis.count(), zone_offset_view);
     // 日志等级
     color_start = buf.readable();
     buf.append(to_string_view(msg.lv));
@@ -81,6 +87,7 @@ class default_formatter final : public formatter {
  private:
   // 用于存储日期和时间的缓冲区
   detail::base_memory_buffer<128> date_and_time_{};
+  detail::base_memory_buffer<32> zone_offset_{};
   // 上次处理的秒数，用于避免重复格式化日期时间
   std::time_t last_second_{0};
 };
