@@ -1,4 +1,4 @@
-﻿import jt;
+import jt;
 import std;
 
 /**

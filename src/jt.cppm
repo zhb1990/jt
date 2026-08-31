@@ -1,4 +1,4 @@
-﻿export module jt;
+export module jt;
 
 export import :detail.buffer;
 export import :detail.memory;

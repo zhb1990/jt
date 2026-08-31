@@ -36,24 +36,9 @@ if(${CMAKE_SIZEOF_VOID_P} MATCHES "4")
 endif()
 
 find_package(lz4 CONFIG REQUIRED)
-if(NOT lz4_FOUND)
-    message(WARNING "lz4 not found.")
-endif()
-
 find_package(asio CONFIG REQUIRED)
-if(NOT asio_FOUND)
-    message(WARNING "asio not found.")
-endif()
-
 find_package(RapidJSON CONFIG REQUIRED)
-if(NOT RapidJSON_FOUND)
-    message(WARNING "RapidJSON not found.")
-endif()
-
 find_package(mimalloc CONFIG REQUIRED)
-if(NOT mimalloc_FOUND)
-    message(WARNING "mimalloc not found.")
-endif()
 
 set(JT_MODULES
     "src/jt.cppm"
@@ -103,9 +88,9 @@ set(JT_SOURCES
 
 add_library(libjt SHARED)
 target_link_libraries(libjt PRIVATE
-        $<IF:$<TARGET_EXISTS:mimalloc-static>,mimalloc-static,mimalloc>
-        RapidJSON
-        lz4::lz4
+    $<IF:$<TARGET_EXISTS:mimalloc-static>,mimalloc-static,mimalloc>
+    RapidJSON
+    lz4::lz4
 )
 set_target_properties(libjt PROPERTIES PREFIX "")
 if(APPLE)
