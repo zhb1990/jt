@@ -42,8 +42,6 @@ class service_impl {
 
   service_impl();
 
-  ~service_impl();
-
   /**
    * 注册日志记录器
    * @param ptr 要注册的日志记录器共享指针
@@ -77,6 +75,9 @@ class service_impl {
    */
   void request_stop();
 
+  /**
+   * 等待日志服务停止
+   */
   void wait_stop();
 
   /**

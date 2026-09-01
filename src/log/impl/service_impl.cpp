@@ -187,16 +187,6 @@ service_impl::service_impl() {
   }
 }
 
-service_impl::~service_impl() {
-  request_stop();
-  if (writer_thread_.joinable()) {
-    writer_thread_.join();
-  }
-  if (lz4_thread_.joinable()) {
-    lz4_thread_.join();
-  }
-}
-
 void service_impl::register_logger(logger_sptr& ptr) {  // NOLINT
   const auto name = ptr->get_name();
   std::scoped_lock lock{loggers_mutex_};

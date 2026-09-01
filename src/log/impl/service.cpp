@@ -12,7 +12,10 @@ service::service()
     : impl_(std::allocate_shared<service_impl>(
           detail::allocator<service_impl>{})) {}
 
-service::~service() noexcept = default;
+service::~service() noexcept {
+  impl_->request_stop();
+  impl_->wait_stop();
+}
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 auto service::find(const std::string_view name) -> logger_sptr {
