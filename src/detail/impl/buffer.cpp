@@ -26,9 +26,9 @@ void channel_buffer::shrink() noexcept {
  * @param len 数据长度
  */
 void channel_buffer::append(const void* buf, std::size_t len) {
-  len = (std::min)(len, writable());  // 确保不超过可写空间
-  std::memmove(begin(), buf, len);    // 将数据移动到可写区域
-  written(len);                       // 更新写入位置
+  len = (std::min)(len, writable());      // 确保不超过可写空间
+  std::memmove(begin_write(), buf, len);  // 将数据移动到可写区域
+  written(len);                           // 更新写入位置
 }
 
 /**

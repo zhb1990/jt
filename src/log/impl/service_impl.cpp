@@ -62,7 +62,7 @@ void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
   std::filesystem::path path_src = u8strv;
   input.open(path_src, std::ios_base::binary);
   if (!input.is_open()) {
-    print_stderr("compress open input {} fail\n", src);
+    print_stderr("{}: compress open input fail\n", src);
     return;
   }
 
@@ -75,7 +75,7 @@ void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
   path_dest.replace_extension(".log.lz4");
   output.open(path_dest, std::ios_base::binary | std::ios_base::trunc);
   if (!output.is_open()) {
-    print_stderr("compress open output {} fail\n", src);
+    print_stderr("{}: compress open output fail\n", src);
     return;
   }
 
@@ -96,7 +96,7 @@ void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
 
   input.close();
   if (std::error_code ec; !std::filesystem::remove(path_src, ec)) {
-    print_stderr("after compress remove fail, {}\n",
+    print_stderr("{}: after compress remove fail, {}\n", src,
                  detail::system_category().message(ec.value()));
   }
 }

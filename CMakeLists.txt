@@ -68,6 +68,7 @@ set(JT_SOURCES
 
     "src/log/impl/logger.cpp"
     "src/log/impl/service.cpp"
+    "src/log/impl/formatter.cpp"
     "src/log/impl/sink.cpp"
     "src/log/impl/sink_console.cpp"
     "src/log/impl/sink_file.cpp"

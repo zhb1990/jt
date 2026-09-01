@@ -9,7 +9,7 @@
 - `rm -rf build && cmake -B build` - Clean rebuild
 
 **Build Requirements:**
-- CMake >= 4.1.2 (required for C++23 modules support)
+- CMake >= 4.3.0 (required for C++23 modules support)
 - C++23 compiler (Clang >= 17 or GCC >= 13)
 - Libraries: lz4, asio, RapidJSON, mimalloc
 
@@ -23,9 +23,11 @@
 ## Testing
 
 **Manual Testing:**
-- Run `./build/main` to execute the sample application
-- Run `./build/consumer_public` to verify a TU that only does `import jt;`
-- Run `ctest --test-dir build` for the public consumer plus compile-fail checks that internal types are hidden
+- Run `./build/main` to execute the sample application (CMake currently builds `libjt` and `main`)
+
+**Test sources (not yet wired in CMakeLists.txt):**
+- `tests/consumer_public.cpp` — a TU that only does `import jt;`
+- `tests/should_fail/hidden.cpp` — compile-fail checks that internal types are hidden
 
 **Adding Tests:**
 - Public API samples go in `tests/` and link against `libjt`
@@ -75,8 +77,10 @@
 - Memory statistics via `allocated_memory()`, `allocated_size()`
 
 ### Logging API
-- **Formatted logging:** `jt::log::info(logger, "msg {}", arg);`
-- **Variable argument logging:** `jt::log::vinfo(logger, "msg", fmt, args...);`
+- Construct `jt::log::service` to start backend threads; call `request_stop()` when finished
+- `create_logger` takes a movable sink range (e.g. `std::array`) and returns `std::shared_ptr<logger>`
+- Pass `logger&` (dereference the shared_ptr) to log helpers: `jt::log::info(log, "msg {}", arg);`
+- **Variable argument logging:** `jt::log::vinfo(log, fmt, args...);` (`fmt` is `std::string_view`)
 - **Log levels:** trace, debug, info, warn, error, critical
 - **Structured logging:** Use source_location for file/line info
 - Thread-safe: All log functions are thread-safe

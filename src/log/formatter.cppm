@@ -1,5 +1,6 @@
-// 日志格式化器基类接口
-// 定义日志格式化器的抽象基类，所有具体的格式化器需要实现此接口
+module;
+
+#include "../detail/config.h"
 
 export module jt:log.formatter;
 
@@ -14,8 +15,8 @@ export namespace jt::log {
  * 定义了格式化日志记录的纯虚函数接口
  * 具体的格式化器需要继承此类并实现format方法
  */
-struct formatter {
-  virtual ~formatter() = default;
+struct JT_API formatter {
+  virtual ~formatter() noexcept;
 
   /**
    * 格式化日志记录

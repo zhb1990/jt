@@ -11,23 +11,22 @@ JT 是一个现代 C++23 编写的轻量级服务器框架，参考了 skynet �
 
 **核心特性**：
 - 🚀 基于 mimalloc 的高性能内存管理
-- 🔒 无锁数据结构支持
-- 📝 高性能日志系统（支持 LZ4 压缩）
-- 📦 模块化设计，按需引入
+- 📝 高性能日志系统（异步写入、文件轮转、LZ4 压缩）
+- 📦 单模块入口 `import jt;`，内部 partition 不进入公开接口
 - ⚡ 零成本抽象
 
 ## 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| **语言** | C++23 (/modules, std::format, concepts) |
+| **语言** | C++23 (modules, std::format, concepts) |
 | **构建系统** | CMake 4.3.0+ (支持 C++23 Modules) |
 | **内存管理** | mimalloc - 高性能 allocations |
 | **压缩** | lz4 - 快速压缩算法 |
 | **网络** | asio - 跨平台异步 I/O |
 | **数据格式** | RapidJSON - 高性能 JSON 解析 |
 
-用户入口只有 `import jt;`。公开 interface partition 由 `jt.cppm` 全部 `export import`；内部 implementation partition 使用 `module jt:xxx;`（无 `export`），不会进入公开模块接口。
+用户入口只有 `import jt;`。公开 interface partition 由 `jt.cppm` 全部 `export import`；内部 implementation partition 使用 `module jt:xxx;`（无 `export`），不会进入公开模块接口。无锁队列、字符串、哈希表等容器属于内部 partition，不能通过 `import jt;` 使用。
 
 ## 项目结构
 
@@ -37,11 +36,10 @@ jt/
 │   ├── jt.cppm                      # 主模块导出（仅公开 partition）
 │   ├── main.cpp                     # 示例程序入口
 │   │
-│   ├── coroutine/                   # 协程模块 (待开发)
-│   │
 │   ├── detail/                      # 底层模块
+│   │   ├── config.h                 # 内部：JT_API 可见性宏
 │   │   ├── memory.cppm              # 公开：内存管理 (allocate/deallocate)
-│   │   ├── buffer.cppm              # 公开：缓冲区 (read_buffer/write_buffer)
+│   │   ├── buffer.cppm              # 公开：缓冲区 (read_buffer/base_memory_buffer)
 │   │   ├── vector.cppm              # 公开：向量容器
 │   │   ├── cache_line.cppm          # 内部：缓存行对齐
 │   │   ├── cpu_pause.cppm           # 内部：CPU 暂停指令
@@ -92,19 +90,20 @@ jt/
 └── AGENTS.md                        # AI 代理开发指南
 ```
 
+当前构建会生成共享库 `libjt` 和示例程序 `main`。`tests/` 源码已在仓库中，但尚未接入 `CMakeLists.txt`。
+
 ## 核心功能
 
 ### 1. 内存管理
 
 ```cpp
 import jt;
+import std;
 
-// 使用 mimalloc 进行内存分配
 void* ptr = jt::detail::allocate(1024);
-jt::log::info(logger, "allocated size: {}", jt::detail::allocated_size(ptr));
+std::println("allocated size: {}", jt::detail::allocated_size(ptr));
 jt::detail::deallocate(ptr);
 
-// 内存统计
 std::println("total allocated: {}", jt::detail::allocated_memory());
 ```
 
@@ -117,13 +116,12 @@ std::println("total allocated: {}", jt::detail::allocated_memory());
 
 ```cpp
 import jt;
+import std;
 
-// 可变长缓冲区
 jt::detail::base_memory_buffer<1> buffer;
 buffer.append("hello");
 std::format_to(std::back_inserter(buffer), " {}", "world");
 
-// 只读缓冲区
 jt::detail::read_buffer rb(buffer);
 std::string_view view(rb);
 ```
@@ -136,40 +134,43 @@ std::string_view view(rb);
 
 ```cpp
 import jt;
+import std;
 
-// 创建日志服务
 jt::log::service service;
 
-// 配置文件日志
 jt::log::sink_file_config config;
-config.daily_rotation = true;     // 按日期轮转
+config.daily_rotation = true;
 config.directory = "./logs";
 config.name = "app";
-config.max_size = 1024 * 1024;    // 按大小轮转阈值
-config.keep_days = 7;              // 日志保留天数
-config.lz4_directory = "./logs/lz4"; // LZ4 压缩文件目录
+config.max_size = 1024 * 1024;
+config.keep_days = 7;
+config.lz4_directory = "./logs/lz4";
 
-// 创建日志器
-auto sink1 = jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(service, config);
-auto sink2 = jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>();
-auto logger = service.create_logger({sink1, sink2}, "my_logger", true);
+std::array sinks{
+    jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
+        service, config),
+    jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
 
-// 打印日志
-jt::log::info(logger, "Hello {}", "World");
-jt::log::warn(logger, "Memory: {}", jt::detail::allocated_memory());
-jt::log::verror(logger, "Error: code={}", 500);
+const auto log_ptr = service.create_logger(std::move(sinks), "my_logger", true);
+auto& log = *log_ptr;
 
-service.stop();
+jt::log::info(log, "Hello {}", "World");
+jt::log::warn(log, "Memory: {}", jt::detail::allocated_memory());
+jt::log::verror(log, "Error: code={}", 500);
+
+service.request_stop();
 ```
 
+- **生命周期**: 构造 `service` 即启动后台线程；结束时调用 `request_stop()`（析构也会请求停止）
+- **创建 logger**: `create_logger` 接受可移动的 sink 范围（如 `std::array`），返回 `std::shared_ptr<logger>`；`jt::log::info` 等接口需要 `logger&`
 - **多级别**: trace, debug, info, warn, error, critical
-- **多输出**: 控制台、文件（可同时输出到多个目标）
+- **多输出**: 控制台（`sink_stdout` / `sink_stderr`）、文件（可同时输出到多个目标）
 - **文件日志特性**:
   - 按大小轮转（超过 `max_size` 自动切分）
   - 按日期轮转（每天一个新文件）
   - LZ4 压缩存储（节省磁盘空间）
-- **线程安全**: 无锁设计，支持高并发日志输出
-- **格式化**: 使用 `std::format` 语法
+- **线程安全**: 异步路径使用内部无锁队列
+- **格式化**: 使用 `std::format` 语法；`vinfo` / `vwarn` 等接受运行时格式串
 
 ## 构建与运行
 
@@ -229,22 +230,21 @@ build\main.exe
 import jt;
 import std;
 
-int main(int argc, char** argv) {
-    // 初始化日志服务
-    jt::log::service service;
-    service.start();
+int main() {
+  jt::log::service service;
 
-    // 创建控制台输出
-    auto sink = jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>();
-    auto logger = service.create_logger({sink}, "example", true);
+  std::array sinks{
+      jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
+  const auto log_ptr =
+      service.create_logger(std::move(sinks), "example", true);
+  auto& log = *log_ptr;
 
-    // 打印日志
-    jt::log::info(logger, "Application started");
-    jt::log::warn(logger, "This is a warning message");
-    jt::log::error(logger, "Error occurred: {}", 500);
+  jt::log::info(log, "Application started");
+  jt::log::warn(log, "This is a warning message");
+  jt::log::error(log, "Error occurred: {}", 500);
 
-    service.stop();
-    return 0;
+  service.request_stop();
+  return 0;
 }
 ```
 
@@ -252,6 +252,7 @@ int main(int argc, char** argv) {
 
 ```cpp
 import jt;
+import std;
 
 void* ptr = jt::detail::allocate(256);
 std::println("Pointer: {}, Size: {}", ptr, jt::detail::allocated_size(ptr));
@@ -264,13 +265,12 @@ std::println("Total memory allocated: {}", jt::detail::allocated_memory());
 
 ```cpp
 import jt;
+import std;
 
-// 创建缓冲区并写入数据
 jt::detail::base_memory_buffer<1> buffer;
 buffer.append("Hello, ");
 std::format_to(std::back_inserter(buffer), "World!");
 
-// 读取缓冲区内容
 jt::detail::read_buffer rb(buffer);
 std::string_view view(rb);
 std::println("Buffer content: {}", view);
@@ -291,6 +291,7 @@ std::println("Buffer content: {}", view);
 - [ ] 协程模块 (`coroutine/`)
 - [ ] 网络库封装 (基于 asio)
 - [ ] 服务器框架核心
+- [ ] 将 `tests/` 接入 CMake / CTest（public consumer 与内部可见性编译失败检查）
 - [ ] 单元测试
 - [ ] 性能基准测试
 
