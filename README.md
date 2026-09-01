@@ -81,16 +81,12 @@ jt/
 │   └── types/                       # 类型定义
 │       └── writable_buffer.cppm     # 可写缓冲区概念
 │
-├── tests/
-│   ├── consumer_public.cpp          # 只 import jt; 的独立消费者
-│   └── should_fail/hidden.cpp       # 确认内部类型不可见
-│
 ├── CMakeLists.txt                   # 构建配置
 ├── README.md                        # 项目文档
 └── AGENTS.md                        # AI 代理开发指南
 ```
 
-当前构建会生成共享库 `libjt` 和示例程序 `main`。`tests/` 源码已在仓库中，但尚未接入 `CMakeLists.txt`。
+当前构建会生成共享库 `libjt` 和示例程序 `main`。
 
 ## 核心功能
 
@@ -291,7 +287,6 @@ std::println("Buffer content: {}", view);
 - [ ] 协程模块 (`coroutine/`)
 - [ ] 网络库封装 (基于 asio)
 - [ ] 服务器框架核心
-- [ ] 将 `tests/` 接入 CMake / CTest（public consumer 与内部可见性编译失败检查）
 - [ ] 单元测试
 - [ ] 性能基准测试
 

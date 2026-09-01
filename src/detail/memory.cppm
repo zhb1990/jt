@@ -1,7 +1,5 @@
 module;
 
-#include <cassert>
-
 #include "config.h"
 
 export module jt:detail.memory;
@@ -251,7 +249,7 @@ auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
   auto* mem = allocate(sizeof(Derived));
   try {
     auto* ptr = ::new (mem) Derived(std::forward<Types>(args)...);
-    return dynamic_unique_ptr<Base>{dynamic_cast<Base*>(ptr), {mem}};
+    return dynamic_unique_ptr<Base>{ptr, {mem}};
   } catch (...) {
     deallocate(mem);
     throw;

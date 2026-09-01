@@ -24,7 +24,7 @@ class sink_file_imp {
    */
   explicit sink_file_imp(std::shared_ptr<service_impl> s,
                          const sink_file_config& config)
-      : service_(std::move(s)),
+      : service_(s),
         max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {

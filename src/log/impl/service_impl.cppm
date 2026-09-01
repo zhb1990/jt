@@ -32,6 +32,7 @@ struct lz4_data {
   detail::vector<char> input_chunk;
   detail::vector<char> output_buff;
   LZ4F_compressionContext_t ctx{nullptr};
+  bool ctx_invalid{false};
 };
 
 class service_impl {
@@ -75,6 +76,8 @@ class service_impl {
    * 请求停止日志服务
    */
   void request_stop();
+
+  void wait_stop();
 
   /**
    * 获取默认日志记录器

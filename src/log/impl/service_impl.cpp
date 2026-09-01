@@ -52,8 +52,8 @@ lz4_data::lz4_data() {  // NOLINT(*-pro-type-member-init)
 
 lz4_data::~lz4_data() noexcept { LZ4F_freeCompressionContext(ctx); }
 
-void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
-    const detail::string& src, const detail::string& directory) {
+void lz4_data::compress(const detail::string& src,
+                        const detail::string& directory) {
   auto stamp = std::chrono::high_resolution_clock::now();
   // 转成utf-8指针
   std::ifstream input;
@@ -66,13 +66,30 @@ void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
     return;
   }
 
+  if (ctx_invalid) {
+    if (ctx) {
+      LZ4F_freeCompressionContext(ctx);
+      ctx = nullptr;
+    }
+
+    const size_t ec = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
+    if (LZ4F_isError(ec)) {
+      print_stderr("Failed to recreate LZ4 context: {}\n",
+                   LZ4F_getErrorName(ec));
+      ctx = nullptr;
+      return;
+    }
+
+    ctx_invalid = false;
+  }
+
   // 转成utf-8指针
   std::ofstream output;
   u8strv = {reinterpret_cast<const char8_t*>(directory.c_str()),
             directory.size()};
   std::filesystem::path path_dest = u8strv;
   path_dest /= path_src.filename();
-  path_dest.replace_extension(".log.lz4");
+  path_dest.replace_extension(".log.lz4.tmp");
   output.open(path_dest, std::ios_base::binary | std::ios_base::trunc);
   if (!output.is_open()) {
     print_stderr("{}: compress open output fail\n", src);
@@ -82,8 +99,15 @@ void lz4_data::compress(  // NOLINT(*-convert-member-functions-to-static)
   std::uint64_t count_out = 0;
   std::uint64_t count_in = 0;
   if (!compress_file(output, count_out, count_in, input)) {
+    ctx_invalid = true;
+    std::error_code ec;
+    std::filesystem::remove(path_dest, ec);
     return;
   }
+
+  std::error_code ec_rename;
+  const auto path_final = path_dest.replace_extension(".log.lz4");
+  std::filesystem::rename(path_dest, path_final, ec_rename);
 
   if (count_in > 0) {
     auto cost = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -110,6 +134,7 @@ bool lz4_data::compress_file(std::ofstream& output, std::uint64_t& count_out,
     print_stderr("Failed to start compression: error 0x{:x}\n", header_size);
     return false;
   }
+
   output.write(output_buff.data(), static_cast<std::streamsize>(header_size));
   count_out = header_size;
 
@@ -128,6 +153,7 @@ bool lz4_data::compress_file(std::ofstream& output, std::uint64_t& count_out,
       print_stderr("Compression failed: error 0x{:x}\n", compressed_size);
       return false;
     }
+
     output.write(output_buff.data(),
                  static_cast<std::streamsize>(compressed_size));
     count_out += compressed_size;
@@ -140,6 +166,7 @@ bool lz4_data::compress_file(std::ofstream& output, std::uint64_t& count_out,
     print_stderr("Failed to end compression: error 0x{:x}\n", compressed_size);
     return false;
   }
+
   output.write(output_buff.data(),
                static_cast<std::streamsize>(compressed_size));
   count_out += compressed_size;
@@ -206,6 +233,15 @@ void service_impl::request_stop() {
   std::scoped_lock lock{writer_mutex_};
   writer_stop_requested_.store(true, std::memory_order::relaxed);
   writer_cv_.notify_one();
+}
+
+void service_impl::wait_stop() {
+  if (writer_thread_.joinable()) {
+    writer_thread_.join();
+  }
+  if (lz4_thread_.joinable()) {
+    lz4_thread_.join();
+  }
 }
 
 auto service_impl::get_default() -> logger_sptr {  // NOLINT
@@ -402,10 +438,26 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
                         detail::system_category().message(ec.value()));
   }
 
-  for (const auto& entry : iter) {
-    const auto filename = entry.path().filename().u8string();
-    std::string_view strv{reinterpret_cast<const char*>(filename.c_str()),
-                          filename.size()};
+  detail::string filename_start = msg.file_name + "_";
+  const fs::directory_iterator dir_end{};
+  for (; iter != dir_end; iter.increment(ec)) {
+    if (ec) {
+      print_stderr("Failed to iterate directory '{}': {}\n", msg.lz4_directory,
+                   detail::system_category().message(ec.value()));
+      break;
+    }
+
+    const auto& entry = *iter;
+    std::u8string filename;
+    try {
+      filename = entry.path().filename().u8string();
+    } catch (const fs::filesystem_error& e) {
+      print_stderr("cannot convert filename: {}\n", e.what());
+      continue;
+    }
+
+    const std::string_view strv{reinterpret_cast<const char*>(filename.c_str()),
+                                filename.size()};
     if (!entry.is_regular_file(ec)) {
       if (ec) {
         print_stderr("cannot stat file '{}': {}\n", strv,
@@ -414,7 +466,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
       continue;
     }
 
-    if (!strv.starts_with(msg.file_name) || !strv.ends_with(".log.lz4")) {
+    if (!strv.starts_with(filename_start) || !strv.ends_with(".log.lz4")) {
       continue;
     }
 
@@ -444,20 +496,33 @@ void service_impl::lz4_run() {  // NOLINT(*-make-member-function-const)
   while (true) {
     detail::deque<lz4_message> queue;
     bool stop_requested = false;
-    {
+    try {
       std::unique_lock lock{lz4_mutex_};
       lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
         return !lz4_queue_.empty() || lz4_stop_requested_;
       });
       queue = std::move(lz4_queue_);
       stop_requested = lz4_stop_requested_;
+    } catch (const std::exception& e) {
+      print_stderr("lz4 worker exception: {}\n", e.what());
+      continue;
+    } catch (...) {
+      print_stderr("lz4 worker unknown exception\n");
+      continue;
     }
 
     for (auto& msg : queue) {
-      if (msg.tp == lz4_message::type::lz4) {
-        lz4_data_.compress(msg.file_name, msg.lz4_directory);
-      } else if (msg.tp == lz4_message::type::clear) {
-        clear_lz4_files(msg);
+      try {
+        if (msg.tp == lz4_message::type::lz4) {
+          lz4_data_.compress(msg.file_name, msg.lz4_directory);
+        } else if (msg.tp == lz4_message::type::clear) {
+          clear_lz4_files(msg);
+        }
+      } catch (const std::exception& e) {
+        print_stderr("lz4 worker exception: {}\n", e.what());
+        // 异常可能发生在 compressBegin 之后：这里再 reset_ctx()
+      } catch (...) {
+        print_stderr("lz4 worker unknown exception\n");
       }
     }
 

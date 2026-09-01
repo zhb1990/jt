@@ -20,19 +20,6 @@
 
 **Note:** 32-bit architectures are explicitly rejected in CMakeLists.txt
 
-## Testing
-
-**Manual Testing:**
-- Run `./build/main` to execute the sample application (CMake currently builds `libjt` and `main`)
-
-**Test sources (not yet wired in CMakeLists.txt):**
-- `tests/consumer_public.cpp` — a TU that only does `import jt;`
-- `tests/should_fail/hidden.cpp` — compile-fail checks that internal types are hidden
-
-**Adding Tests:**
-- Public API samples go in `tests/` and link against `libjt`
-- Internal-visibility checks belong in `tests/should_fail/`
-
 ## Code Style Guidelines
 
 ### File Organization

@@ -1,7 +1,5 @@
 module;
 
-#include <memory>
-
 #include "../detail/config.h"
 
 export module jt:log.logger;
