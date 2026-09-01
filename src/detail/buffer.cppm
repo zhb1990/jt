@@ -469,7 +469,7 @@ template <std::size_t Fixed>
  *
  * @tparam Fixed 固定栈内存大小（字节）
  */
-class base_memory_buffer : public channel_buffer {
+class JT_API base_memory_buffer : public channel_buffer {
  public:
   static_assert(Fixed > 0, "Fixed must > 0");
 
@@ -756,10 +756,10 @@ class base_memory_buffer : public channel_buffer {
   bool using_heap_{false};
 };
 
-extern template class JT_API base_memory_buffer<1024>;
-extern template class JT_API base_memory_buffer<2048>;
-extern template class JT_API base_memory_buffer<4096>;
-extern template class JT_API base_memory_buffer<8192>;
+extern template class base_memory_buffer<1024>;
+extern template class base_memory_buffer<2048>;
+extern template class base_memory_buffer<4096>;
+extern template class base_memory_buffer<8192>;
 
 using buffer_1k = base_memory_buffer<1024>;
 using buffer_2k = base_memory_buffer<2048>;

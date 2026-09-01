@@ -1,9 +1,9 @@
-export module jt:detail.unordered_map;
+module jt:detail.unordered_map;
 
 import std;
 import :detail.memory;
 
-export namespace jt::detail {
+namespace jt::detail {
 
 template <class Key, class T, class Hash = std::hash<Key>,
           class KeyEqual = std::equal_to<Key>,

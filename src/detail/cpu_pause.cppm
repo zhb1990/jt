@@ -12,9 +12,9 @@ module;
 #endif
 #endif
 
-export module jt:detail.cpu_pause;
+module jt:detail.cpu_pause;
 
-export namespace jt::detail {
+namespace jt::detail {
 
 /**
  * CPU暂停函数

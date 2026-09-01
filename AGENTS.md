@@ -22,16 +22,14 @@
 
 ## Testing
 
-**Current State:** No automated test suite configured.
-
 **Manual Testing:**
 - Run `./build/main` to execute the sample application
-- This tests all core modules: memory management, logging, buffer handling
+- Run `./build/consumer_public` to verify a TU that only does `import jt;`
+- Run `ctest --test-dir build` for the public consumer plus compile-fail checks that internal types are hidden
 
 **Adding Tests:**
-- Create test files in `tests/` directory
-- Link against `libjt` shared library
-- Use standard C++ test frameworks (Google Test, Catch2, etc.)
+- Public API samples go in `tests/` and link against `libjt`
+- Internal-visibility checks belong in `tests/should_fail/`
 
 ## Code Style Guidelines
 
@@ -49,9 +47,12 @@
 - **Type aliases:** snake_case (e.g., `sink_ptr`)
 
 ### C++23 Module Guidelines
-- Use `export module jt:module.name;` syntax
-- Export entire namespaces: `export namespace jt::log { ... }`
-- Internal modules use `module;` preamble, exported modules use `export module;`
+- Keep a single named module `jt`. Users only `import jt;`
+- Public interface partitions: `export module jt:name;` and `export namespace`
+- Internal implementation partitions: `module jt:name;` (no `export`) and a non-exported namespace
+- `jt.cppm` must `export import` every public partition (direct or indirect); never `export import` internal partitions
+- Public partitions must not import internal partitions
+- Implementation units stay `module jt;`
 - Import dependencies before exports: `import std;` first
 
 ### Formatting
@@ -81,9 +82,10 @@
 - Thread-safe: All log functions are thread-safe
 
 ### Import Conventions
-- Module imports: `import jt;` or `import jt:log.logger;`
+- User code: `import jt;` only
 - Standard library: `import std;`
-- Internal module dependencies: `import :detail.buffer;`
+- Same-module partitions: `import :log.logger;` / `import :detail.buffer;`
+- Internal partitions (`:log.message`, `:detail.os`, queues, etc.) may only be imported by implementation units and other internal partitions
 
 ### Type Definitions
 - Use `std::uint32_t`, `std::int64_t` for explicit-width integers
@@ -93,10 +95,9 @@
 - `std::format_string<Args...>` for format string type safety
 
 ### Module Structure
-- **Detail module files** (internal implementation): `src/detail/*.cppm`
-- **Impl files** (compiled implementations): `src/detail/impl/*.cpp`
-- **Log module files:** `src/log/*.cppm`
-- **Log impl files:** `src/log/impl/*.cpp`
+- **Public partitions:** listed in `JT_PUBLIC_MODULES` and `export import`ed by `src/jt.cppm`
+- **Internal partitions:** listed in `JT_PRIVATE_MODULES`; `module jt:xxx;` without `export`
+- **Impl files:** `src/detail/impl/*.cpp`, `src/log/impl/*.cpp` use `module jt;`
 
 ## Cursor/Copilot Rules
 

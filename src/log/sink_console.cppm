@@ -8,12 +8,11 @@ import std;
 import :log.sink;
 import :detail.memory;
 
-export namespace jt::log {
-
-/**
- * 控制台Sink实现类的前向声明
- */
+namespace jt::log {
 class sink_console_impl;
+}
+
+export namespace jt::log {
 
 /**
  * 标准输出Sink类
@@ -33,13 +32,14 @@ class JT_API sink_stdout final : public sink {
    */
   ~sink_stdout() noexcept override;
 
+ protected:
   /**
    * 写入日志到标准输出
    * @param lv 日志级别
    * @param 时间点（未使用）
    * @param buf 日志缓冲区
    * @param color_start 颜色开始位置（用于控制台着色）
-   * @param color_stop 颜色结束位置（用于控制台着色）
+   * @param color_stop 颜色停止位置（用于控制台着色）
    */
   void write(level lv, const time_point&, const detail::buffer_1k& buf,
              std::size_t color_start, std::size_t color_stop) override;
@@ -73,13 +73,14 @@ class JT_API sink_stderr final : public sink {
    */
   ~sink_stderr() noexcept override;
 
+ protected:
   /**
    * 写入日志到标准错误
    * @param lv 日志级别
    * @param 时间点（未使用）
    * @param buf 日志缓冲区
    * @param color_start 颜色开始位置（用于控制台着色）
-   * @param color_stop 颜色结束位置（用于控制台着色）
+   * @param color_stop 颜色停止位置（用于控制台着色）
    */
   void write(level lv, const time_point&, const detail::buffer_1k& buf,
              std::size_t color_start, std::size_t color_stop) override;

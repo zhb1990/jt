@@ -6,8 +6,12 @@ export module jt:log.sink.file;
 
 import std;
 import :log.sink;
+import :log.fwd;
 import :detail.memory;
-import :detail.string;
+
+namespace jt::log {
+class sink_file_imp;
+}
 
 export namespace jt::log {
 
@@ -30,8 +34,6 @@ struct sink_file_config {  // NOLINT(*-pro-type-member-init)
   std::uint32_t keep_days{30};
 };
 
-class sink_file_imp;
-
 /**
  * 文件日志Sink类
  * 实现将日志写入文件的功能，支持日志轮换和LZ4压缩
@@ -50,6 +52,7 @@ class JT_API sink_file : public sink {
    */
   ~sink_file() noexcept override;
 
+ protected:
   /**
    * 写入日志条目
    * @param level 日志级别

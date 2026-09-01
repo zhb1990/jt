@@ -8,10 +8,13 @@ import std;
 import :detail.memory;
 import :detail.buffer;
 import :detail.vector;
-import :detail.string;
 import :log.level;
 import :log.sink;
 import :log.fwd;
+
+namespace jt::log {
+class service_impl;
+}
 
 export namespace jt::log {
 
@@ -119,26 +122,11 @@ class service {
   JT_API auto create_logger(const std::string_view& name, bool async,
                             detail::vector<sink_ptr>& sinks) -> logger_sptr;
 
-  /**
-   * 触发日志文件的LZ4压缩
-   * @param file_name 要压缩的日志文件路径
-   * @param lz4_directory LZ4压缩文件存储目录
-   */
-  void post_lz4(const std::filesystem::path& file_name,
-                std::string_view lz4_directory);
-
-  /**
-   * 清理过期的LZ4压缩日志文件
-   * @param name 日志记录器名称
-   * @param lz4_directory LZ4压缩文件目录
-   * @param keep_days 保留天数
-   */
-  void clear_lz4(const detail::string& name, std::string_view lz4_directory,
-                 std::uint32_t keep_days);
+ private:
+  friend class sink_file;
 
   auto get_impl() -> std::shared_ptr<service_impl>;
 
- private:
   /** Pimpl idiom实现指针 */
   std::shared_ptr<service_impl> impl_;
 };

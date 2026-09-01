@@ -2,9 +2,11 @@
 module jt;
 
 import std;
+import :detail.os;
 import :detail.string;
 import :detail.vector;
 import :log.message;
+import :log.record;
 import :log.service_impl;
 
 namespace jt::log {
@@ -78,10 +80,10 @@ class logger_impl {
    * @param msg 要处理的日志消息
    * @note 此函数被标记为NOLINT以避免关于空catch块的警告
    */
-  void backend_log(const message& msg) const {
+  void backend_log(const log_record_view& record) const {
     for (const auto& sink : sinks_) {
       try {
-        sink->log(msg);
+        sink->consume(record);
       } catch (...) {
         // 忽略所有异常以防止日志失败导致程序崩溃
       }
@@ -116,7 +118,7 @@ class logger_impl {
   bool async_;
 };
 
-logger::logger(std::shared_ptr<service_impl>& service,
+logger::logger(ctor_key, std::shared_ptr<service_impl>& service,
                const std::string_view& name, detail::vector<sink_ptr> sinks,
                bool async)
     : impl_(detail::make_unique<logger_impl>(service, name, sinks, async)) {}
@@ -154,14 +156,14 @@ void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,  // NOLINT
   if (!impl_->is_async()) {
     // 同步模式下直接处理日志消息
     message msg;
-    msg.buf = std::move(buf);
+    msg.payload = std::move(buf);
     msg.source = source;
     msg.lv = lv;
-    msg.sid = sid;
-    msg.point = std::chrono::system_clock::now();
+    msg.service_id = sid;
+    msg.timestamp = std::chrono::system_clock::now();
     msg.type = message_type::log;
-    msg.tid = detail::tid();
-    return impl_->backend_log(msg);
+    msg.thread_id = detail::tid();
+    return impl_->backend_log(msg.record());
   }
 
   // 异步模式下委托给服务处理日志消息
@@ -171,7 +173,9 @@ void logger::log(std::uint32_t sid, level lv, detail::buffer_1k& buf,  // NOLINT
   }
 }
 
-void logger::backend_log(const message& msg) { return impl_->backend_log(msg); }
+void logger::backend_log(const log_record_view& record) {
+  return impl_->backend_log(record);
+}
 
 void logger::backend_flush() { return impl_->backend_flush(); }
 

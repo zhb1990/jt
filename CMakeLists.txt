@@ -5,25 +5,6 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_MODULE_STD ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 检测是否为 Apple 平台，并设置 SDKROOT
-if(APPLE)
-    find_program(CMAKE_XCRUN xcrun REQUIRED)
-    execute_process(
-        COMMAND ${CMAKE_XCRUN} --show-sdk-path
-        OUTPUT_VARIABLE CMAKE_OSX_SYSROOT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
-
-    find_program(CMAKE_BREW brew REQUIRED)
-    execute_process(
-        COMMAND ${CMAKE_BREW} --prefix llvm
-        OUTPUT_VARIABLE CMAKE_LLVM_PREFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(CMAKE_CXX_COMPILER_ID_ARG1 "-resource-dir=${CMAKE_LLVM_PREFIX}/lib/c++")
-endif()
-
 if(WIN32)
     add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>"
         "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -40,36 +21,41 @@ find_package(asio CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
 find_package(mimalloc CONFIG REQUIRED)
 
-set(JT_MODULES
+set(JT_PUBLIC_MODULES
     "src/jt.cppm"
 
     "src/types/writable_buffer.cppm"
 
-    "src/detail/cache_line.cppm"
-    "src/detail/cpu_pause.cppm"
     "src/detail/memory.cppm"
     "src/detail/buffer.cppm"
-    "src/detail/intrusive_queue.cppm"
-    "src/detail/atomic_intrusive_queue.cppm"
-    "src/detail/intrusive_mpsc_queue.cppm"
-    "src/detail/metric_value.cppm"
-    "src/detail/os.cppm"
-    "src/detail/string.cppm"
     "src/detail/vector.cppm"
-    "src/detail/deque.cppm"
-    "src/detail/unordered_map.cppm"
 
-    "src/log/level.cppm"
     "src/log/fwd.cppm"
-    "src/log/logger.cppm"
-    "src/log/message.cppm"
-    "src/log/service.cppm"
+    "src/log/level.cppm"
+    "src/log/record.cppm"
     "src/log/formatter.cppm"
     "src/log/sink.cppm"
-    "src/log/default_formatter.cppm"
+    "src/log/logger.cppm"
+    "src/log/service.cppm"
     "src/log/sink_console.cppm"
     "src/log/sink_file.cppm"
     "src/log/functions.cppm"
+)
+
+set(JT_PRIVATE_MODULES
+    "src/detail/cache_line.cppm"
+    "src/detail/cpu_pause.cppm"
+    "src/detail/metric_value.cppm"
+    "src/detail/os.cppm"
+    "src/detail/string.cppm"
+    "src/detail/deque.cppm"
+    "src/detail/unordered_map.cppm"
+    "src/detail/intrusive_queue.cppm"
+    "src/detail/atomic_intrusive_queue.cppm"
+    "src/detail/intrusive_mpsc_queue.cppm"
+
+    "src/log/message.cppm"
+    "src/log/default_formatter.cppm"
     "src/log/impl/service_impl.cppm"
 )
 
@@ -95,15 +81,29 @@ target_link_libraries(libjt PRIVATE
     lz4::lz4
 )
 set_target_properties(libjt PROPERTIES PREFIX "")
-if(APPLE)
-    target_link_directories(libjt PUBLIC ${CMAKE_LLVM_PREFIX}/lib/c++)
-endif()
+
 target_sources(libjt
-    PRIVATE ${JT_HEADERS} ${JT_SOURCES}
-    PUBLIC FILE_SET CXX_MODULES FILES ${JT_MODULES}
+    PUBLIC
+        FILE_SET jt_public_modules
+        TYPE CXX_MODULES
+        FILES ${JT_PUBLIC_MODULES}
+    PRIVATE
+        FILE_SET jt_private_modules
+        TYPE CXX_MODULES
+        FILES ${JT_PRIVATE_MODULES}
+    PRIVATE
+        ${JT_HEADERS}
+        ${JT_SOURCES}
 )
-if(WIN32)
+if(WIN32 OR CYGWIN)
+    # BMI bakes in this define; a consumer-side JT_DLL_IMPORT would not re-expand JT_API.
     target_compile_definitions(libjt PRIVATE JT_DLL_EXPORT)
+else()
+    target_compile_definitions(libjt PRIVATE JT_LIB_VISIBILITY)
+    set_target_properties(libjt PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
 endif()
 
 add_executable(main "src/main.cpp")

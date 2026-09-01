@@ -1,42 +1,38 @@
-export module jt:log.message;
+module jt:log.message;
 
 import std;
 import :detail.buffer;
-import :log.level;
+import :log.record;
 import :log.fwd;
 
-export namespace jt::log {
+namespace jt::log {
 
-/**
- * 日志消息类型枚举
- */
-enum message_type : std::uint8_t { log, flush };
+enum class message_type : std::uint8_t {
+  log,
+  flush,
+};
 
-/**
- * 日志消息结构体
- * 用于在日志系统内部传递日志信息
- */
 struct message {
-  // ReSharper disable once CppRedundantQualifier
-  /** 消息类型：日志或刷新 */
   message_type type{message_type::log};
-  /** 日志级别 */
+  std::weak_ptr<logger> target{};
   level lv{level::off};
-  /** 服务ID */
-  std::uint32_t sid{0};
-  /** 线程ID */
-  std::uint64_t tid{0};
-  /** 日志记录器弱引用（避免循环引用） */
-  std::weak_ptr<logger> logger{};
-  /** 时间戳 */
-  std::chrono::system_clock::time_point point{};
-  /** 源代码位置信息（文件、行号等） */
+  std::uint32_t service_id{0};
+  std::uint64_t thread_id{0};
+  std::chrono::system_clock::time_point timestamp{};
   std::source_location source{};
-  /** 日志内容缓冲区 */
-  detail::buffer_1k buf;
-
-  /** 下一个消息的指针（用于链表或队列） */
+  detail::buffer_1k payload{};
   std::atomic<message*> next{nullptr};
+
+  [[nodiscard]] auto record() const noexcept -> log_record_view {
+    return {
+        .lv = lv,
+        .service_id = service_id,
+        .thread_id = thread_id,
+        .timestamp = timestamp,
+        .source = source,
+        .payload = std::string_view(payload),
+    };
+  }
 };
 
 }  // namespace jt::log

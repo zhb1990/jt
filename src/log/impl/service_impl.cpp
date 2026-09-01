@@ -6,8 +6,11 @@ module jt;
 
 import std;
 
+import :detail.os;
+import :detail.string;
 import :detail.unordered_map;
 import :detail.cpu_pause;
+import :log.message;
 import :log.service_impl;
 
 namespace jt::log {
@@ -219,7 +222,7 @@ void service_impl::flush(const logger_wptr& ptr) {
     return;
   }
 
-  msg->logger = ptr;
+  msg->target = ptr;
   msg->type = message_type::flush;
   return push_log_message(msg);
 }
@@ -232,14 +235,14 @@ void service_impl::log(const logger_wptr& ptr, const std::uint32_t sid,
     return;
   }
 
-  msg->logger = ptr;
+  msg->target = ptr;
   msg->type = message_type::log;
-  msg->buf = std::move(buf);
+  msg->payload = std::move(buf);
   msg->source = source;
   msg->lv = lv;
-  msg->sid = sid;
-  msg->point = std::chrono::system_clock::now();
-  msg->tid = detail::tid();
+  msg->service_id = sid;
+  msg->timestamp = std::chrono::system_clock::now();
+  msg->thread_id = detail::tid();
   return push_log_message(msg);
 }
 
@@ -311,9 +314,9 @@ inline void service_impl::writer_do_message() {
   while (!is_empty) {
     // ReSharper disable once CppDFAEndlessLoop
     if (msg) {
-      if (const auto ptr = msg->logger.lock()) {
+      if (const auto ptr = msg->target.lock()) {
         if (msg->type == message_type::log) {
-          ptr->backend_log(*msg);
+          ptr->backend_log(msg->record());
         } else {
           ptr->backend_flush();
         }

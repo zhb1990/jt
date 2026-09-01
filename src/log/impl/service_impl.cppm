@@ -2,7 +2,7 @@ module;
 
 #include <lz4frame.h>
 
-export module jt:log.service_impl;
+module jt:log.service_impl;
 
 import std;
 import :detail.memory;
@@ -17,7 +17,7 @@ import :log.sink;
 import :log.fwd;
 import :log.message;
 
-export namespace jt::log {
+namespace jt::log {
 
 struct lz4_data {
   lz4_data();

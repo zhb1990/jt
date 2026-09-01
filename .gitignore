@@ -31,7 +31,7 @@
 *.out
 *.app
 *.vscode
-build/
+build*/
 cmake-build*/
 .cache/
 .idea

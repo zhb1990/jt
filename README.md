@@ -27,56 +27,65 @@ JT 是一个现代 C++23 编写的轻量级服务器框架，参考了 skynet �
 | **网络** | asio - 跨平台异步 I/O |
 | **数据格式** | RapidJSON - 高性能 JSON 解析 |
 
+用户入口只有 `import jt;`。公开 interface partition 由 `jt.cppm` 全部 `export import`；内部 implementation partition 使用 `module jt:xxx;`（无 `export`），不会进入公开模块接口。
+
 ## 项目结构
 
 ```
 jt/
 ├── src/
-│   ├── jt.cppm                      # 主模块导出
+│   ├── jt.cppm                      # 主模块导出（仅公开 partition）
 │   ├── main.cpp                     # 示例程序入口
 │   │
 │   ├── coroutine/                   # 协程模块 (待开发)
 │   │
-│   ├── detail/                      # 底层实现模块
-│   │   ├── cache_line.cppm          # 缓存行对齐工具
-│   │   ├── cpu_pause.cppm           # CPU 暂停指令
-│   │   ├── memory.cppm              # 内存管理 (allocate/deallocate)
-│   │   ├── buffer.cppm              # 缓冲区 (read_buffer/write_buffer)
-│   │   ├── intrusive_queue.cppm     # 侵入式单链表队列
-│   │   ├── atomic_intrusive_queue.cppm # 原子侵入式队列
-│   │   ├── intrusive_mpsc_queue.cppm  # MPSC 队列
-│   │   ├── deque.cppm               # 双端队列
-│   │   ├── vector.cppm              # 向量容器
-│   │   ├── string.cppm              # 字符串工具
-│   │   ├── unordered_map.cppm       # 哈希表
-│   │   ├── metric_value.cppm        # 指标值统计
-│   │   ├── os.cppm                  # 操作系统接口
+│   ├── detail/                      # 底层模块
+│   │   ├── memory.cppm              # 公开：内存管理 (allocate/deallocate)
+│   │   ├── buffer.cppm              # 公开：缓冲区 (read_buffer/write_buffer)
+│   │   ├── vector.cppm              # 公开：向量容器
+│   │   ├── cache_line.cppm          # 内部：缓存行对齐
+│   │   ├── cpu_pause.cppm           # 内部：CPU 暂停指令
+│   │   ├── intrusive_queue.cppm     # 内部：侵入式单链表队列
+│   │   ├── atomic_intrusive_queue.cppm # 内部：原子侵入式队列
+│   │   ├── intrusive_mpsc_queue.cppm  # 内部：MPSC 队列
+│   │   ├── deque.cppm               # 内部：双端队列
+│   │   ├── string.cppm              # 内部：字符串
+│   │   ├── unordered_map.cppm       # 内部：哈希表
+│   │   ├── metric_value.cppm        # 内部：内存统计
+│   │   ├── os.cppm                  # 内部：操作系统接口
 │   │   └── impl/
 │   │       ├── buffer.cpp           # 缓冲区实现
 │   │       ├── memory.cpp           # 内存管理实现
 │   │       └── os.cpp               # OS 实现
 │   │
-│   ├── log/                         # 日志系统模块
-│   │   ├── level.cppm               # 日志级别 (trace/debug/info/warn/error/critical)
-│   │   ├── fwd.cppm                 # 前向声明
-│   │   ├── logger.cppm              # 日志器实现
-│   │   ├── message.cppm             # 日志消息结构
-│   │   ├── service.cppm             # 日志服务
-│   │   ├── formatter.cppm           # 格式化器接口
-│   │   ├── default_formatter.cppm   # 默认格式化器
-│   │   ├── sink.cppm                # 日志输出基类
-│   │   ├── sink_console.cppm        # 控制台输出
-│   │   ├── sink_file.cppm           # 文件输出 (支持 LZ4 压缩)
-│   │   ├── functions.cppm           # 日志宏 (info/warn/error/critical/v*)
+│   ├── log/                         # 日志系统
+│   │   ├── level.cppm               # 公开：日志级别
+│   │   ├── fwd.cppm                 # 公开：前向声明
+│   │   ├── record.cppm              # 公开：log_record_view
+│   │   ├── formatter.cppm           # 公开：格式化器接口
+│   │   ├── sink.cppm                # 公开：日志输出基类
+│   │   ├── logger.cppm              # 公开：日志器
+│   │   ├── service.cppm             # 公开：日志服务
+│   │   ├── sink_console.cppm        # 公开：控制台输出
+│   │   ├── sink_file.cppm           # 公开：文件输出 (LZ4 压缩)
+│   │   ├── functions.cppm           # 公开：info/warn/error/critical/v*
+│   │   ├── message.cppm             # 内部：异步队列节点
+│   │   ├── default_formatter.cppm   # 内部：默认格式化器
 │   │   └── impl/
+│   │       ├── service_impl.cppm    # 内部：service Pimpl
 │   │       ├── logger.cpp           # 日志器实现
 │   │       ├── service.cpp          # 日志服务实现
 │   │       ├── sink.cpp             # 输出基类实现
 │   │       ├── sink_console.cpp     # 控制台输出实现
-│   │       └── sink_file.cpp        # 文件输出实现
+│   │       ├── sink_file.cpp        # 文件输出实现
+│   │       └── service_impl.cpp     # service Pimpl 实现
 │   │
 │   └── types/                       # 类型定义
-│       └── writable_buffer.cppm     # 可写缓冲区类型
+│       └── writable_buffer.cppm     # 可写缓冲区概念
+│
+├── tests/
+│   ├── consumer_public.cpp          # 只 import jt; 的独立消费者
+│   └── should_fail/hidden.cpp       # 确认内部类型不可见
 │
 ├── CMakeLists.txt                   # 构建配置
 ├── README.md                        # 项目文档
@@ -123,27 +132,7 @@ std::string_view view(rb);
 - `base_memory_buffer<N>`: 可变长缓冲区（模板参数为容量指数）
 - 支持 `std::format` 写入
 
-### 3. 无锁队列
-
-```cpp
-import jt;
-
-// 单消费者
-jt::detail::intrusive_queue queue;
-queue.push(node);
-auto node = queue.pop();
-
-// 多生产者单消费者
-jt::detail::intrusive_mpsc_queue mpsc;
-mpsc.push(node);
-```
-
-- `intrusive_queue`: 侵入式单链表队列
-- `atomic_intrusive_queue`: 原子侵入式队列（线程安全）
-- `intrusive_mpsc_queue`: 多生产者单消费者队列
-- 无锁设计，零内存分配
-
-### 4. 高性能日志系统
+### 3. 高性能日志系统
 
 ```cpp
 import jt;

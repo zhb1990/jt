@@ -9,13 +9,14 @@ import :detail.buffer;
 import :detail.memory;
 import :log.level;
 import :log.fwd;
+import :log.record;
+
+namespace jt::log {
+class sink_impl;
+class logger_impl;
+}  // namespace jt::log
 
 export namespace jt::log {
-
-/**
- * 日志Sink的实现类前向声明
- */
-class sink_impl;
 
 /**
  * 日志Sink基类接口
@@ -47,12 +48,6 @@ class JT_API sink {
   void set_level(level lv);
 
   /**
-   * 处理日志消息
-   * @param msg 要处理的日志消息
-   */
-  void log(const message& msg);
-
-  /**
    * 刷新Sink
    * 确保所有缓冲的日志都被写出
    */
@@ -64,6 +59,7 @@ class JT_API sink {
    */
   void set_formatter(formatter_ptr ptr);
 
+ protected:
   /**
    * 写入日志数据（纯虚函数）
    * 必须由派生类实现
@@ -71,7 +67,7 @@ class JT_API sink {
    * @param point 时间点
    * @param buf 日志缓冲区
    * @param color_start 颜色开始位置（用于控制台着色）
-   * @param color_stop 颜色结束位置（用于控制台着色）
+   * @param color_stop 颜色停止位置（用于控制台着色）
    */
   virtual void write(level lv, const time_point& point,
                      const detail::buffer_1k& buf, std::size_t color_start,
@@ -85,6 +81,12 @@ class JT_API sink {
   virtual void flush_unlock() = 0;
 
  private:
+  friend class logger;
+  friend class logger_impl;
+  friend class sink_impl;
+
+  void consume(const log_record_view& record);
+
   /** Pimpl idiom实现指针 */
   detail::unique_ptr<sink_impl> impl_;
 };

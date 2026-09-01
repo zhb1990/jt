@@ -2,7 +2,7 @@
 module jt;
 
 import std;
-import :log.message;
+import :log.record;
 import :log.default_formatter;
 
 namespace jt::log {
@@ -35,9 +35,9 @@ class sink_impl {
    * @param s 用于写入日志的Sink接口指针
    * @note 此函数参数被标记为NOLINT以避免误报
    */
-  void log(const message& msg, sink* s) {  // NOLINT
+  void log(const log_record_view& record, sink* s) {  // NOLINT
     // 检查日志级别是否满足阈值
-    if (static_cast<std::uint8_t>(msg.lv) >
+    if (static_cast<std::uint8_t>(record.lv) >
         static_cast<std::uint8_t>(lv_.load(std::memory_order::relaxed))) {
       return;
     }
@@ -45,10 +45,8 @@ class sink_impl {
     detail::buffer_1k buf;
     std::size_t color_start = 0, color_stop = 0;
     std::lock_guard lock(mtx_);
-    // 使用格式化器格式化日志消息
-    formatter_->format(msg, buf, color_start, color_stop);
-    // 写入格式化后的日志
-    return s->write(msg.lv, msg.point, buf, color_start, color_stop);
+    formatter_->format(record, buf, color_start, color_stop);
+    return s->write(record.lv, record.timestamp, buf, color_start, color_stop);
   }
 
   /**
@@ -97,11 +95,9 @@ sink::~sink() noexcept = default;
  */
 void sink::set_level(const level lv) { return impl_->set_level(lv); }
 
-/**
- * 处理日志消息
- * @param msg 要处理的日志消息
- */
-void sink::log(const message& msg) { return impl_->log(msg, this); }
+void sink::consume(const log_record_view& record) {
+  return impl_->log(record, this);
+}
 
 /**
  * 刷新Sink

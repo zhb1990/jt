@@ -6,6 +6,7 @@ module;
 module jt;
 
 import std;
+import :detail.string;
 import :log.service_impl;
 
 namespace jt::log {
@@ -21,8 +22,9 @@ class sink_file_imp {
    * @param s 日志服务引用
    * @param config 文件日志配置
    */
-  explicit sink_file_imp(service& s, const sink_file_config& config)
-      : service_(s.get_impl()),
+  explicit sink_file_imp(std::shared_ptr<service_impl> s,
+                         const sink_file_config& config)
+      : service_(std::move(s)),
         max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
@@ -272,7 +274,7 @@ class sink_file_imp {
  * 通过PIMPL idiom隐藏实现细节
  */
 sink_file::sink_file(service& s, const sink_file_config& config)
-    : impl_(detail::make_unique<sink_file_imp>(s, config)) {}
+    : impl_(detail::make_unique<sink_file_imp>(s.get_impl(), config)) {}
 
 sink_file::~sink_file() noexcept = default;
 

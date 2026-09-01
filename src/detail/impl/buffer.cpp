@@ -109,9 +109,9 @@ auto channel_buffer::prepend(const void* buf, const std::size_t len) noexcept
 }
 
 // 显式实例化模板类以避免链接错误
-template class JT_API base_memory_buffer<1024>;
-template class JT_API base_memory_buffer<2048>;
-template class JT_API base_memory_buffer<4096>;
-template class JT_API base_memory_buffer<8192>;
+template class base_memory_buffer<1024>;
+template class base_memory_buffer<2048>;
+template class base_memory_buffer<4096>;
+template class base_memory_buffer<8192>;
 
 }  // namespace jt::detail

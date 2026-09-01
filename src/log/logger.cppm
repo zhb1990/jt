@@ -1,6 +1,7 @@
 module;
 
 #include <memory>
+
 #include "../detail/config.h"
 
 export module jt:log.logger;
@@ -11,13 +12,14 @@ import :detail.buffer;
 import :detail.vector;
 import :log.sink;
 import :log.fwd;
+import :log.record;
+
+namespace jt::log {
+class logger_impl;
+class service_impl;
+}  // namespace jt::log
 
 export namespace jt::log {
-
-/**
- * 日志记录器实现类的前向声明
- */
-class logger_impl;
 
 /**
  * 日志记录器类
@@ -26,20 +28,21 @@ class logger_impl;
  */
 class logger : public std::enable_shared_from_this<logger> {
  public:
-  /** 友元类：服务实现类，需要访问logger的内部成员 */
-  friend class service_impl;
   /** Sink智能指针类型别名 */
   using sink_ptr = detail::dynamic_unique_ptr<sink>;
 
   /**
-   * 构造函数
-   * @param service 日志服务引用
-   * @param name 日志记录器名称
-   * @param sinks Sink集合
-   * @param async 是否异步模式
+   * 仅允许 service::create_logger 通过 allocate_shared 构造。
+   * 用户无法构造 ctor_key，因此不能直接创建 logger。
    */
-  logger(std::shared_ptr<service_impl>& service, const std::string_view& name,
-         detail::vector<sink_ptr> sinks, bool async);
+  class ctor_key {
+    ctor_key() = default;
+    friend class service;
+  };
+
+  logger(ctor_key, std::shared_ptr<service_impl>& service,
+         const std::string_view& name, detail::vector<sink_ptr> sinks,
+         bool async);
 
   /**
    * 析构函数
@@ -87,19 +90,13 @@ class logger : public std::enable_shared_from_this<logger> {
   JT_API void log(std::uint32_t sid, level lv, detail::buffer_1k& buf,
                   const std::source_location& source);
 
- protected:
-  /**
-   * 后端日志处理（内部使用）
-   * @param msg 要处理的日志消息
-   */
-  void backend_log(const message& msg);
+ private:
+  friend class service_impl;
+  friend class service;
 
-  /**
-   * 后端刷新处理（内部使用）
-   */
+  void backend_log(const log_record_view& record);
   void backend_flush();
 
- private:
   /** Pimpl idiom实现指针 */
   detail::unique_ptr<logger_impl> impl_;
 };

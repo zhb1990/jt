@@ -1,7 +1,5 @@
 module;
 
-#include <lz4frame.h>
-
 // module jt:log.service;
 module jt;
 
@@ -52,23 +50,11 @@ void service::log(const logger_wptr& ptr, const std::uint32_t sid,
 auto service::create_logger(const std::string_view& name,  // NOLINT
                             const bool async, detail::vector<sink_ptr>& sinks)
     -> logger_sptr {
-  auto ptr = std::allocate_shared<logger>(detail::allocator<logger>{}, impl_,
-                                          name, std::move(sinks), async);
+  auto ptr = std::allocate_shared<logger>(detail::allocator<logger>{},
+                                          logger::ctor_key{}, impl_, name,
+                                          std::move(sinks), async);
   impl_->register_logger(ptr);
   return ptr;
-}
-
-// ReSharper disable once CppMemberFunctionMayBeConst
-void service::post_lz4(const std::filesystem::path& file_name,
-                       const std::string_view lz4_directory) {
-  return impl_->post_lz4(file_name, lz4_directory);
-}
-
-// ReSharper disable once CppMemberFunctionMayBeConst
-void service::clear_lz4(const detail::string& name,
-                        const std::string_view lz4_directory,
-                        const std::uint32_t keep_days) {
-  return impl_->clear_lz4(name, lz4_directory, keep_days);
 }
 
 auto service::get_impl() -> std::shared_ptr<service_impl> { return impl_; }
