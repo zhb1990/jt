@@ -38,9 +38,8 @@ class logger : public std::enable_shared_from_this<logger> {
     friend class service;
   };
 
-  logger(ctor_key, std::shared_ptr<service_impl>& service,
-         const std::string_view& name, detail::vector<sink_ptr> sinks,
-         bool async);
+  logger(ctor_key, service& service, const std::string_view& name,
+         detail::vector<sink_ptr> sinks, bool async);
 
   /**
    * 析构函数

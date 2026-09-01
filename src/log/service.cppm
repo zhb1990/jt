@@ -109,7 +109,7 @@ class service {
     detail::vector<sink_ptr> sinks(
         std::make_move_iterator(std::ranges::begin(range)),
         std::make_move_iterator(std::ranges::end(range)));
-    return create_logger(name, async, sinks);
+    return create_logger(name, async, std::move(sinks));
   }
 
   /**
@@ -120,10 +120,11 @@ class service {
    * @return 创建的日志记录器
    */
   JT_API auto create_logger(const std::string_view& name, bool async,
-                            detail::vector<sink_ptr>& sinks) -> logger_sptr;
+                            detail::vector<sink_ptr> sinks) -> logger_sptr;
 
  private:
   friend class sink_file;
+  friend class logger;
 
   auto get_impl() -> std::shared_ptr<service_impl>;
 

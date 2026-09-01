@@ -25,7 +25,7 @@ class logger_impl {
    * @param async 是否异步模式
    * @note 此构造函数参数被标记为NOLINT以避免误报
    */
-  logger_impl(std::shared_ptr<service_impl>& service,
+  logger_impl(std::shared_ptr<service_impl> service,
               const std::string_view& name,  // NOLINT
               detail::vector<service::sink_ptr>& sinks, const bool async)
       : service_(service),
@@ -118,10 +118,10 @@ class logger_impl {
   bool async_;
 };
 
-logger::logger(ctor_key, std::shared_ptr<service_impl>& service,
-               const std::string_view& name, detail::vector<sink_ptr> sinks,
-               bool async)
-    : impl_(detail::make_unique<logger_impl>(service, name, sinks, async)) {}
+logger::logger(ctor_key, service& service, const std::string_view& name,
+               detail::vector<sink_ptr> sinks, bool async)
+    : impl_(detail::make_unique<logger_impl>(service.get_impl(), name, sinks,
+                                             async)) {}
 
 logger::~logger() noexcept = default;
 

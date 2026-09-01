@@ -51,10 +51,10 @@ void service::log(const logger_wptr& ptr, const std::uint32_t sid,
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 auto service::create_logger(const std::string_view& name,  // NOLINT
-                            const bool async, detail::vector<sink_ptr>& sinks)
+                            const bool async, detail::vector<sink_ptr> sinks)
     -> logger_sptr {
   auto ptr = std::allocate_shared<logger>(detail::allocator<logger>{},
-                                          logger::ctor_key{}, impl_, name,
+                                          logger::ctor_key{}, *this, name,
                                           std::move(sinks), async);
   impl_->register_logger(ptr);
   return ptr;

@@ -114,14 +114,13 @@ void lz4_data::compress(const detail::string& src,
                     std::chrono::high_resolution_clock::now() - stamp)
                     .count();
     auto rate = static_cast<double>(count_out) / static_cast<double>(count_in);
-    print_stdout("{}: compress {} -> {} bytes, {:.2}, {}ms\n", src, count_in,
+    print_stdout("{}: compress {} -> {} bytes, {:.2f}, {}ms\n", src, count_in,
                  count_out, rate, cost);
   }
 
   input.close();
   if (std::error_code ec; !std::filesystem::remove(path_src, ec)) {
-    print_stderr("{}: after compress remove fail, {}\n", src,
-                 detail::system_category().message(ec.value()));
+    print_stderr("{}: after compress remove fail, {}\n", src, ec.message());
   }
 }
 
@@ -406,8 +405,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
   if (!fs::exists(directory, ec)) {
     if (ec) {
       return print_stderr("Error checking existence of '{}': {}\n",
-                          msg.lz4_directory,
-                          detail::system_category().message(ec.value()));
+                          msg.lz4_directory, ec.message());
     }
     return print_stderr("Path is not exists '{}'\n", msg.lz4_directory);
   }
@@ -415,8 +413,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
   if (!fs::is_directory(directory, ec)) {
     if (ec) {
       return print_stderr("Error checking if directory '{}': {}\n",
-                          msg.lz4_directory,
-                          detail::system_category().message(ec.value()));
+                          msg.lz4_directory, ec.message());
     }
     return print_stderr("Path is not a directory: '{}'\n", msg.lz4_directory);
   }
@@ -424,8 +421,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
   fs::directory_iterator iter(directory, ec);
   if (ec) {
     return print_stderr("Failed to open directory '{}': {}\n",
-                        msg.lz4_directory,
-                        detail::system_category().message(ec.value()));
+                        msg.lz4_directory, ec.message());
   }
 
   detail::string filename_start = msg.file_name + "_";
@@ -433,7 +429,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
   for (; iter != dir_end; iter.increment(ec)) {
     if (ec) {
       print_stderr("Failed to iterate directory '{}': {}\n", msg.lz4_directory,
-                   detail::system_category().message(ec.value()));
+                   ec.message());
       break;
     }
 
@@ -450,8 +446,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
                                 filename.size()};
     if (!entry.is_regular_file(ec)) {
       if (ec) {
-        print_stderr("cannot stat file '{}': {}\n", strv,
-                     detail::system_category().message(ec.value()));
+        print_stderr("cannot stat file '{}': {}\n", strv, ec.message());
       }
       continue;
     }
@@ -463,8 +458,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
     // 获取最后修改时间
     auto last_write = entry.last_write_time(ec);
     if (ec) {
-      print_stderr("cannot get mtime of '{}': {}\n", strv,
-                   detail::system_category().message(ec.value()));
+      print_stderr("cannot get mtime of '{}': {}\n", strv, ec.message());
       continue;
     }
 
@@ -475,8 +469,7 @@ void service_impl::clear_lz4_files(const lz4_message& msg) {  // NOLINT
                      duration_cast<hours>(cutoff - last_write).count() / 24.0,
                      strv);
       } else {
-        print_stderr("Failed to remove '{}': {}\n", strv,
-                     detail::system_category().message(ec.value()));
+        print_stderr("Failed to remove '{}': {}\n", strv, ec.message());
       }
     }
   }

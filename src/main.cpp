@@ -8,10 +8,6 @@ import std;
  * 2. 日志系统（同步/异步、文件轮换、控制台输出）
  * 3. 缓冲区操作
  */
-struct test_node {
-  std::int64_t value{0};
-  test_node* next{nullptr};
-};
 
 int main(int argc, char** argv) {
   // 打印初始内存使用情况
@@ -34,8 +30,6 @@ int main(int argc, char** argv) {
         jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
             service, config),
         jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     // 创建异步日志记录器
     const auto log_ptr = service.create_logger(std::move(a1), "test", true);
     auto& log = *log_ptr;

@@ -3,14 +3,8 @@
  * 提供对进程/线程ID和系统错误处理的跨平台访问
  */
 
-/**
- * 开始模块序言
- */
 module;
 
-/**
- * 平台特定的包含
- */
 #if defined(_WIN32)
 #include <Windows.h>
 #include <process.h>
@@ -27,10 +21,6 @@ module;
 #include <unistd.h>
 #endif
 
-/**
- * 声明此为jt模块的一部分（不是独立的子模块）
- * // module jt:detail.os;
- */
 module jt;
 
 import std;

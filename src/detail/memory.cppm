@@ -57,7 +57,7 @@ class allocator {
   allocator(const allocator&) = default;
 
   template <class Other>
-  explicit allocator(const allocator<Other>&) noexcept {}
+  allocator(const allocator<Other>&) noexcept {}
 
   ~allocator() = default;
 
