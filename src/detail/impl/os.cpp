@@ -6,8 +6,10 @@
 module;
 
 #if defined(_WIN32)
-#include <Windows.h>
 #include <process.h>
+
+#include "../win32.h"
+
 #elif defined(macintosh) || defined(Macintosh) || \
     (defined(__APPLE__) && defined(__MACH__))  // mac ios
 #include <libproc.h>

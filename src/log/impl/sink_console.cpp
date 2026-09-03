@@ -1,7 +1,7 @@
 module;
 
 #ifdef _WIN32
-#include <windows.h>
+#include "../../detail/win32.h"
 #else
 #include <unistd.h>
 

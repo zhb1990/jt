@@ -59,7 +59,9 @@ set(JT_PRIVATE_MODULES
     "src/log/impl/service_impl.cppm"
 )
 
-set(JT_HEADERS "src/detail/config.h")
+set(JT_HEADERS
+    "src/detail/config.h"
+    "src/detail/win32.h")
 
 set(JT_SOURCES
     "src/detail/impl/buffer.cpp"
@@ -85,16 +87,16 @@ set_target_properties(libjt PROPERTIES PREFIX "")
 
 target_sources(libjt
     PUBLIC
-        FILE_SET jt_public_modules
-        TYPE CXX_MODULES
-        FILES ${JT_PUBLIC_MODULES}
+    FILE_SET jt_public_modules
+    TYPE CXX_MODULES
+    FILES ${JT_PUBLIC_MODULES}
     PRIVATE
-        FILE_SET jt_private_modules
-        TYPE CXX_MODULES
-        FILES ${JT_PRIVATE_MODULES}
+    FILE_SET jt_private_modules
+    TYPE CXX_MODULES
+    FILES ${JT_PRIVATE_MODULES}
     PRIVATE
-        ${JT_HEADERS}
-        ${JT_SOURCES}
+    ${JT_HEADERS}
+    ${JT_SOURCES}
 )
 if(WIN32 OR CYGWIN)
     # BMI bakes in this define; a consumer-side JT_DLL_IMPORT would not re-expand JT_API.
@@ -107,6 +109,22 @@ else()
     )
 endif()
 
+if(MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(libjt PRIVATE "LINKER:--allow-multiple-definition")
+    target_link_libraries(libjt PUBLIC stdc++exp)
+endif()
+
 add_executable(main "src/main.cpp")
 add_dependencies(main libjt)
 target_link_libraries(main PRIVATE libjt)
+
+if(MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    get_filename_component(_mingw_bindir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    add_custom_command(TARGET main POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${_mingw_bindir}/libstdc++-6.dll"
+        "${_mingw_bindir}/libgcc_s_seh-1.dll"
+        "${_mingw_bindir}/libwinpthread-1.dll"
+        $<TARGET_FILE_DIR:main>
+        VERBATIM)
+endif()
