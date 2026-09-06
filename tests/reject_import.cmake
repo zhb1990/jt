@@ -1,0 +1,11 @@
+execute_process(COMMAND "${CMAKE_COMMAND}" --build "${BUILD_DIR}" --config "${CONFIG}" --target "${TARGET}"
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+if(result EQUAL 0)
+    message(FATAL_ERROR "Consumer unexpectedly imported ${MODULE}")
+endif()
+set(diagnostics "${output}\n${error}")
+string(FIND "${diagnostics}" "${MODULE}" module_position)
+string(TOLOWER "${diagnostics}" normalized)
+if(module_position EQUAL -1 OR NOT normalized MATCHES "(not found|not available|not accessible|private|failed to read|unknown compiled module)")
+    message(FATAL_ERROR "Failure did not diagnose unavailable module ${MODULE}:\n${diagnostics}")
+endif()

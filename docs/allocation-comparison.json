@@ -1,0 +1,74 @@
+[
+  {
+    "version": "before",
+    "iteration": 1,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "before",
+    "iteration": 1,
+    "mode": "async",
+    "allocations": 20015
+  },
+  {
+    "version": "before",
+    "iteration": 2,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "before",
+    "iteration": 2,
+    "mode": "async",
+    "allocations": 20015
+  },
+  {
+    "version": "before",
+    "iteration": 3,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "before",
+    "iteration": 3,
+    "mode": "async",
+    "allocations": 20015
+  },
+  {
+    "version": "after",
+    "iteration": 1,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "after",
+    "iteration": 1,
+    "mode": "async",
+    "allocations": 20015
+  },
+  {
+    "version": "after",
+    "iteration": 2,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "after",
+    "iteration": 2,
+    "mode": "async",
+    "allocations": 20015
+  },
+  {
+    "version": "after",
+    "iteration": 3,
+    "mode": "sync",
+    "allocations": 15
+  },
+  {
+    "version": "after",
+    "iteration": 3,
+    "mode": "async",
+    "allocations": 20015
+  }
+]

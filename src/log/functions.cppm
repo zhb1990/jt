@@ -13,7 +13,7 @@ export module jt.log.functions;
 import std;
 import jt.log.core;
 import jt.log.level;
-import jt.detail.buffer;
+import jt.base.buffer;
 
 namespace jt::log {
 
@@ -23,7 +23,7 @@ void write_log(std::uint32_t sid, logger& dest, level lv,
   if (!dest.should_log(lv)) return;
 
   try {
-    detail::buffer_1k buf;
+    base::buffer_1k buf;
     std::forward<Format>(format)(std::back_inserter(buf));
     dest.log(sid, lv, buf, source);
   } catch (...) {

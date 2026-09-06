@@ -1,315 +1,88 @@
-# JT 框架说明文档
+# JT Framework
 
-> C++23 模块化游戏服务器框架 | 基于 mimalloc 的高性能内存管理
+使用 C++23 modules 的服务器框架基础库，提供基于 mimalloc 的内存管理、缓冲区和同步/异步日志。后续的协程、网络与可选 Actor 服务按独立领域扩展，均依赖日志。
 
-[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
-[![CMake](https://img.shields.io/badge/CMake-4.3.0+-blue.svg)](https://cmake.org/)
+## 当前能力
 
-## 项目概述
+- `import jt;`：基础与日志便捷入口。
+- `import jt.base;`：内存、智能指针、缓冲区、容器及概念，命名空间 `jt::base`。
+- `import jt.log;`：logger、service、formatter、控制台与文件 sink，命名空间 `jt::log`。
+- 文件日志支持大小/日期轮转、manifest 恢复、LZ4 归档和过期清理。
+- 协程、网络、Actor 尚未实现；当前没有对应模块或构建开关。
 
-JT 是一个现代 C++23 编写的轻量级服务器框架，参考了 skynet 的设计理念，采用 C++23 模块化架构。项目专注于高性能、低延迟的服务器开发，特别适用于游戏服务器后端场景。
+## 构建
 
-**核心特性**：
-- 🚀 基于 mimalloc 的高性能内存管理
-- 📝 高性能日志系统（异步写入、文件轮转、LZ4 压缩）
-- 📦 公开入口 `import jt;`，也可按需 `import jt.log;` / `import jt.detail;`
-- ⚡ 零成本抽象
+需要 CMake 4.3+、Ninja 1.11+、64 位工具链，以及 mimalloc、LZ4、RapidJSON 的 CMake packages。当前不需要 Asio。
 
-## 技术栈
+工具链必须同时支持 C++23 语言特性和 `import std`。CMake 的 `import std` 支持范围包括 GCC 15+、LLVM Clang 18.1.2+ 与匹配的标准库、MSVC 14.36+；这些是支持门槛，不代表所有组合都已验证。项目还使用 `std::format`、`std::print`、时区数据库及显式对象参数，应以完整构建和测试为准。Apple Clang 不等同于 Homebrew LLVM Clang。
 
-| 类别 | 技术 |
-|------|------|
-| **语言** | C++23 (modules, std::format, concepts) |
-| **构建系统** | CMake 4.3.0+ (支持 C++23 Modules) |
-| **内存管理** | mimalloc - 高性能 allocations |
-| **压缩** | lz4 - 快速压缩算法 |
-| **网络** | asio - 跨平台异步 I/O |
-| **数据格式** | RapidJSON - 高性能 JSON 解析 |
+参考：[CMake C++ modules 文档](https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html)。实验性 `import std` gate 随 CMake 版本变化；当前默认 gate 在本机 CMake 4.4.3 验证通过，其他版本可通过同名 CMake cache 参数覆盖。
 
-用户入口推荐 `import jt;`（`src/jt.cppm` 再导出 `jt.log` 与 `jt.detail`）。也可以只 `import jt.log;` 或 `import jt.detail;`。
+```sh
+# 首次配置时通过 CXX 选择编译器；依赖可通过 CMAKE_PREFIX_PATH 查找。
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
 
-`jt.log.cppm` / `jt.detail.cppm` 只 `export import` 独立命名模块，不再用主模块 `export import` 分区（避免 GCC Darwin 上虚类型 typeinfo 重复）。`logger` / `service` 因循环依赖与 pimpl 留在 `jt.log.core` 分区中；`formatter` / `sink` 及其派生类是独立命名模块。无锁队列、字符串、哈希表等属于 PRIVATE 命名模块，不能通过公开入口使用。
-
-## 项目结构
-
-```
-jt/
-├── src/
-│   ├── jt.cppm                      # 伞模块：export import jt.log / jt.detail
-│   ├── jt.log.cppm                  # 日志入口：export import 日志命名模块
-│   ├── jt.detail.cppm               # 细节入口：export import 内存/缓冲区命名模块
-│   ├── main.cpp                     # 示例程序入口（import jt;）
-│   │
-│   ├── detail/                      # 底层模块
-│   │   ├── config.h                 # 内部：JT_API 可见性宏
-│   │   ├── win32.h                  # 内部：Windows / MinGW 头文件包装
-│   │   ├── memory.cppm              # 公开命名模块：allocate / unique_ptr
-│   │   ├── buffer.cppm              # 公开命名模块：read_buffer / base_memory_buffer
-│   │   ├── vector.cppm              # 公开命名模块：vector
-│   │   ├── cache_line.cppm          # 内部命名模块：缓存行对齐
-│   │   ├── cpu_pause.cppm           # 内部命名模块：CPU 暂停指令
-│   │   ├── intrusive_queue.cppm     # 内部命名模块：侵入式单链表队列
-│   │   ├── atomic_intrusive_queue.cppm # 内部命名模块：原子侵入式队列
-│   │   ├── intrusive_mpsc_queue.cppm  # 内部命名模块：MPSC 队列
-│   │   ├── deque.cppm               # 内部命名模块：双端队列
-│   │   ├── string.cppm              # 内部命名模块：字符串
-│   │   ├── unordered_map.cppm       # 内部命名模块：哈希表
-│   │   ├── metric_value.cppm        # 内部命名模块：内存统计
-│   │   ├── os.cppm                  # 内部命名模块：操作系统接口
-│   │   └── impl/
-│   │       ├── buffer.cpp           # module jt.detail.buffer
-│   │       ├── memory.cpp           # module jt.detail.memory
-│   │       └── os.cpp               # module jt.detail.os
-│   │
-│   ├── log/                         # 日志系统
-│   │   ├── core.cppm                # 公开命名模块 jt.log.core（再导出分区）
-│   │   ├── fwd.cppm                 # 公开分区 jt.log.core:fwd
-│   │   ├── logger.cppm              # 公开分区 jt.log.core:logger
-│   │   ├── service.cppm             # 公开分区 jt.log.core:service
-│   │   ├── message.cppm             # 内部实现分区 jt.log.core:message
-│   │   ├── level.cppm               # 公开命名模块：日志级别
-│   │   ├── record.cppm              # 公开命名模块：log_record_view
-│   │   ├── formatter.cppm           # 公开命名模块：格式化器接口
-│   │   ├── sink.cppm                # 公开命名模块：日志输出基类
-│   │   ├── sink_console.cppm        # 公开命名模块：sink_stdout / sink_stderr
-│   │   ├── sink_file.cppm           # 公开命名模块：文件输出（LZ4 压缩）
-│   │   ├── functions.cppm           # 公开命名模块：info / warn / error / v*
-│   │   ├── default_formatter.cppm   # 内部命名模块：默认格式化器
-│   │   └── impl/
-│   │       ├── service_impl.cppm    # 内部实现分区 jt.log.core:service_impl
-│   │       ├── logger.cpp           # module jt.log.core
-│   │       ├── service.cpp          # module jt.log.core
-│   │       ├── service_impl.cpp     # module jt.log.core
-│   │       ├── formatter.cpp        # module jt.log.formatter
-│   │       ├── sink.cpp             # module jt.log.sink
-│   │       ├── sink_console.cpp     # module jt.log.sink.console
-│   │       └── sink_file.cpp        # module jt.log.sink.file
-│   │
-│   └── types/                       # 类型定义
-│       └── writable_buffer.cppm     # 公开命名模块：writable_buffer 概念
-│
-├── CMakeLists.txt                   # 构建配置
-├── README.md                        # 项目文档
-└── AGENTS.md                        # AI 代理开发指南
+# Release 同时构建基准程序。
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+./build/release/benchmarks/jt_log_benchmark
 ```
 
-当前构建会生成共享库 `libjt` 和示例程序 `main`。公开模块列在 `JT_PUBLIC_MODULES`，内部模块列在 `JT_PRIVATE_MODULES`（BMI 不向下游传播）。
+C++ 编译的第三方依赖也必须与所选编译器/标准库匹配。特别是 macOS 上，不应将 Apple Clang/libc++ 构建的 mimalloc 静态库直接混入 GCC/libstdc++；Debug 偶然链接成功并不代表 Release 可用。可使用匹配的 vcpkg triplet，或通过 `mimalloc_DIR` 指向同工具链构建的包。
 
-## 核心功能
+使用 vcpkg 时，在首次配置追加：
 
-### 1. 内存管理
+```sh
+cmake --preset debug -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+```
+
+示例程序位于 `build/debug/examples/main`（Windows 为 `main.exe`）。示例会在工作目录写日志，建议在单独的临时目录运行。保留 `cmake --build build/debug --target main`。
+
+当前选项：`BUILD_TESTING=ON`、`JT_BUILD_EXAMPLES=ON`、`JT_BUILD_BENCHMARKS=OFF`。Release preset 将 benchmarks 打开。
+
+## 消费库
+
+在同一 CMake 构建中使用 `add_subdirectory` 或 FetchContent 引入项目，然后链接 `jt::jt`。该别名对应共享库 `libjt`，公开传递 C++23 编译要求和模块文件集。消费工程同样需要在创建目标前配置 `import std` 支持（包括相应 CMake experimental gate 和 `CMAKE_CXX_MODULE_STD=ON`）。目前不提供安装包，也不分发跨工具链通用 BMI。
+
+```cmake
+add_subdirectory(path/to/jt)
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE jt::jt)
+```
 
 ```cpp
-import jt;
 import std;
-
-void* ptr = jt::detail::allocate(1024);
-std::println("allocated size: {}", jt::detail::allocated_size(ptr));
-jt::detail::deallocate(ptr);
-
-std::println("total allocated: {}", jt::detail::allocated_memory());
-```
-
-- 基于 mimalloc 的高性能内存分配器
-- 支持 `allocate` / `deallocate` 接口
-- 内存统计: `allocated_memory()`, `allocated_size(void*)`
-- 自定义智能指针: `unique_ptr`, `dynamic_unique_ptr`（基类必须有虚析构）
-
-### 2. 缓冲区处理
-
-```cpp
 import jt;
-import std;
-
-jt::detail::base_memory_buffer<1> buffer;
-buffer.append("hello");
-std::format_to(std::back_inserter(buffer), " {}", "world");
-
-jt::detail::read_buffer rb(buffer);
-std::string_view view(rb);
-```
-
-- `read_buffer`: 只读缓冲区，支持零拷贝转换为 `string_view`
-- `base_memory_buffer<N>`: 可变长缓冲区，`N` 为栈上内联容量（字节）；不足时改用堆
-- 常用别名: `buffer_1k` / `buffer_2k` / `buffer_4k` / `buffer_8k`
-- 支持 `std::format` 写入
-
-### 3. 高性能日志系统
-
-```cpp
-import jt;
-import std;
-
-jt::log::service service;
-
-jt::log::sink_file_config config;
-config.daily_rotation = true;
-config.directory = "./logs";
-config.name = "app";
-config.max_size = 1024 * 1024;
-config.keep_days = 7;
-config.lz4_directory = "./logs/lz4";
-
-std::array sinks{
-    jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
-        service, config),
-    jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
-
-const auto log_ptr = service.create_logger(std::move(sinks), "my_logger", true);
-auto& log = *log_ptr;
-
-jt::log::info(log, "Hello {}", "World");
-jt::log::warn(log, "Memory: {}", jt::detail::allocated_memory());
-jt::log::verror(log, "Error: code={}", 500);
-
-service.request_stop();
-```
-
-- **生命周期**: 构造 `service` 即启动后台线程；结束时调用 `request_stop()`（析构也会请求停止）
-- **创建 logger**: 只能通过 `service::create_logger`；接受可移动的 sink 范围（如 `std::array`），返回 `std::shared_ptr<logger>`。`jt::log::info` 等接口需要 `logger&`
-- **多级别**: trace, debug, info, warn, error, critical
-- **多输出**: 控制台（`sink_stdout` / `sink_stderr`）、文件（可同时输出到多个目标）
-- **文件日志特性**:
-  - 按大小轮转（超过 `max_size` 自动切分，默认 200MB）
-  - 按日期轮转（`daily_rotation`，默认开启）
-  - LZ4 压缩存储（`lz4_directory`，默认保留 `keep_days` 30 天）
-- **线程安全**: 异步路径使用内部无锁队列
-- **格式化**: 使用 `std::format` 语法；`vinfo` / `vwarn` 等接受运行时格式串（`std::string_view`）
-
-## 构建与运行
-
-### 环境要求
-
-- CMake >= 4.3.0（需要支持 C++23 Modules）
-- Clang >= 17 或 GCC >= 13（支持 C++23 模块）
-- lz4、asio、RapidJSON、mimalloc 库
-
-### macOS 构建
-
-```bash
-# 安装依赖 (使用 Homebrew)
-brew install llvm lz4 asio rapidjson mimalloc
-
-# 构建
-cmake -B build
-cmake --build build
-
-# 运行示例程序
-./build/main
-```
-
-### Linux 构建
-
-```bash
-# 安装依赖 (Ubuntu/Debian)
-sudo apt install cmake liblz4-dev libasio-dev rapidjson-dev libmimalloc-dev
-
-# 构建
-cmake -B build
-cmake --build build
-
-# 运行示例程序
-./build/main
-```
-
-### Windows 构建
-
-```bash
-# 使用 vcpkg 安装依赖
-vcpkg install lz4 asio rapidjson mimalloc
-
-# 构建
-cmake -B build
-cmake --build build
-
-# 运行示例程序
-build\main.exe
-```
-
-## 使用示例
-
-### 基础日志使用
-
-```cpp
-import jt;
-import std;
 
 int main() {
   jt::log::service service;
-
-  std::array sinks{
-      jt::detail::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()};
-  const auto log_ptr =
-      service.create_logger(std::move(sinks), "example", true);
-  auto& log = *log_ptr;
-
-  jt::log::info(log, "Application started");
-  jt::log::warn(log, "This is a warning message");
-  jt::log::error(log, "Error occurred: {}", 500);
-
+  auto log = service.create_logger(
+      std::array{
+          jt::base::make_dynamic_unique<jt::log::sink, jt::log::sink_stdout>()},
+      "app", true);
+  jt::log::info(*log, "Hello {}", "JT");
+  jt::log::vinfo(*log, "allocated bytes: {}", jt::base::allocated_memory());
   service.request_stop();
-  return 0;
 }
 ```
 
-按需导入时，把 `import jt;` 换成：
+logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
 
-```cpp
-import jt.log;
-import jt.detail;
-```
+## 目录
 
-### 内存管理示例
+| 目录 | 内容 |
+|---|---|
+| `src/base` | 公开基础模块及实现 |
+| `src/detail` | PRIVATE 平台、队列和统计实现 |
+| `src/log/core` | logger/service 接口分区及后端 |
+| `src/log/sinks` | sink 基类、控制台和文件输出 |
+| `examples` | 示例，保留 main 目标 |
+| `tests` | 行为、文件、模块消费及拒绝导入测试 |
+| `benchmarks` | 日志吞吐、提交延迟和内存占用基准 |
+| `cmake` | 模块登记、工具链检查、平台链接规则 |
+| `docs` | 架构、迁移、验证记录 |
 
-```cpp
-import jt;
-import std;
-
-void* ptr = jt::detail::allocate(256);
-std::println("Pointer: {}, Size: {}", ptr, jt::detail::allocated_size(ptr));
-jt::detail::deallocate(ptr);
-
-std::println("Total memory allocated: {}", jt::detail::allocated_memory());
-```
-
-### 缓冲区使用示例
-
-```cpp
-import jt;
-import std;
-
-jt::detail::base_memory_buffer<1> buffer;
-buffer.append("Hello, ");
-std::format_to(std::back_inserter(buffer), "World!");
-
-jt::detail::read_buffer rb(buffer);
-std::string_view view(rb);
-std::println("Buffer content: {}", view);
-```
-
-## 平台支持
-
-| 平台 | 架构 | 状态 |
-|------|------|------|
-| macOS | x64, arm64 | ✅ 完全支持 |
-| Linux | x64, arm64 | ✅ 完全支持 |
-| Windows | x64 | ✅ 完全支持 |
-
-> **注意**: 当前版本仅支持 64 位系统。
-
-## 开发计划
-
-- [ ] 协程模块 (`coroutine/`)
-- [ ] 网络库封装 (基于 asio)
-- [ ] 服务器框架核心
-- [ ] 单元测试
-- [ ] 性能基准测试
-
-## 相关文档
-
-- **AGENTS.md** - AI 代理开发指南，包含代码风格、构建系统和开发规范
-- **.clang-format** - 代码格式化配置（Google Style）
-
-## 作者
-
-JT Framework - 现代 C++23 服务器框架实践
+详见 [架构](docs/architecture.md)、[迁移说明](docs/migration.md)、[验证记录](docs/validation.md) 和 [开发规则](AGENTS.md)。

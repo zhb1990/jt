@@ -1,11 +1,11 @@
 module;
 
-#include "../detail/config.h"
+#include "../detail/platform/config.h"
 
 export module jt.log.formatter;
 
 import std;
-import jt.detail.buffer;
+import jt.base.buffer;
 import jt.log.record;
 
 export namespace jt::log {
@@ -25,7 +25,7 @@ struct JT_API formatter {
    * @param color_start 颜色开始位置（用于终端着色）
    * @param color_stop 颜色停止位置（用于终端着色）
    */
-  virtual void format(const log_record_view& record, detail::buffer_1k& output,
+  virtual void format(const log_record_view& record, base::buffer_1k& output,
                       std::size_t& color_start, std::size_t& color_stop) = 0;
 };
 

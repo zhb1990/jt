@@ -1,0 +1,222 @@
+[
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 997407,
+    "p50": 1000,
+    "p99": 2000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 1
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1135396,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 13034608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 1
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1134494,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 1
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1173571,
+    "p50": 1000,
+    "p99": 3000,
+    "pending_bytes": 10692208,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 1
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1233502,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 2
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1231148,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 11567728,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 2
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1149359,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 2
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1147908,
+    "p50": 1000,
+    "p99": 2000,
+    "pending_bytes": 11681648,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 2
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1145672,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 3
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1157006,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 11384688,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 3
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1205255,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 3
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1272912,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 11439728,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 3
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1216693,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 4
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1188213,
+    "p50": 1000,
+    "p99": 2000,
+    "pending_bytes": 11017328,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 4
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1162723,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 4
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1373626,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 13023088,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 4
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1158480,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 5
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1395089,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 12842608,
+    "retained_bytes": 0,
+    "version": "before",
+    "iteration": 5
+  },
+  {
+    "mode": "sync",
+    "count": 20000,
+    "throughput": 1217953,
+    "p50": 1000,
+    "p99": 1000,
+    "pending_bytes": 298608,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 5
+  },
+  {
+    "mode": "async",
+    "count": 20000,
+    "throughput": 1300306,
+    "p50": 0,
+    "p99": 2000,
+    "pending_bytes": 11035248,
+    "retained_bytes": 0,
+    "version": "after",
+    "iteration": 5
+  }
+]

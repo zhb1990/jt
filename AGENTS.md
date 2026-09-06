@@ -1,127 +1,82 @@
-# AGENTS.md - JT Framework Codebase Guide
+# AGENTS.md — JT Framework
 
-## Build System
+## Build and verification
 
-**Build Commands:**
-- `cmake -B build` - Configure build
-- `cmake --build build` - Build project
-- `cmake --build build --target main` - Build executable
-- `rm -rf build && cmake -B build` - Clean rebuild
+- CMake >= 4.3, Ninja >= 1.11, 64-bit C++23 toolchain with working `import std`.
+- Dependencies: mimalloc, LZ4, RapidJSON CMake packages. Asio is not currently used.
+- `cmake --preset debug`, `cmake --build --preset debug`, `ctest --preset debug`.
+- Select the compiler and dependency toolchain on first configure; see README.md.
+- `release` presets enable benchmarks. Run `build/release/benchmarks/jt_log_benchmark`.
+- `main` remains the example target; output is `<build>/examples/main`. Run in a temporary working directory because it writes logs.
+- Tests cover behavior, file rotation/archives, module consumers and rejected private imports.
+- Current options: BUILD_TESTING, JT_BUILD_EXAMPLES, JT_BUILD_BENCHMARKS.
+- Supported platform intent: macOS/Linux x64 and arm64, Windows x64. Consult docs/validation.md for combinations actually tested.
 
-**Build Requirements:**
-- CMake >= 4.3.0 (required for C++23 modules support)
-- C++23 compiler (Clang >= 17 or GCC >= 13)
-- Libraries: lz4, asio, RapidJSON, mimalloc
+## Source layout
 
-**Platform Support:**
-- macOS (x64, arm64)
-- Linux (x64, arm64)
-- Windows (x64 only)
+- `src/jt.cppm`: umbrella re-exporting jt.base and jt.log.
+- `src/base`: public memory, buffer, containers, concepts; adjacent interface and implementation files.
+- `src/detail/platform`, `concurrency`, `metrics`: cross-domain PRIVATE modules.
+- `src/log/core`: public logger/service partitions and implementation units.
+- `src/log/core/detail`: message, service_impl, writer_backend, archive_worker implementation partitions.
+- `src/log/sinks`: independent sink, console and file named modules.
+- `src/log/detail`: private default formatter.
+- Domain CMakeLists files contribute to the same libjt shared target. Consumer alias: jt::jt.
+- `examples`, `tests`, `benchmarks`, `docs`, `cmake` have separate responsibilities.
 
-**Note:** 32-bit architectures are explicitly rejected in CMakeLists.txt
+## C++23 modules
 
-**Shared library notes:**
-- Target is `libjt` (`PREFIX ""`)
-- Windows/Cygwin: compile with `JT_DLL_EXPORT` so `JT_API` is `__declspec(dllexport)` (BMI bakes this in; consumers must not redefine it)
-- POSIX: `JT_LIB_VISIBILITY` + `CXX_VISIBILITY_PRESET hidden`; public module TUs also get `-fvisibility=default` so GCC module initializers (`_ZGIW*`) are exported
-- MinGW GCC: `--allow-multiple-definition`, link `stdc++exp`, copy runtime DLLs next to `main`
+- Public entry points: `import jt;`, `import jt.base;`, `import jt.log;`, or the documented public named modules.
+- Public foundation modules: jt.base.memory, jt.base.buffer, jt.base.containers, jt.base.concepts.
+- No public jt.detail umbrella or compatibility aliases remain.
+- Register modules with `jt_modules(PUBLIC ...)` or `jt_modules(PRIVATE ...)`; ordinary implementation sources use target_sources PRIVATE.
+- Public interfaces must not import PRIVATE modules. Public templates must have consumer-accessible dependencies.
+- Umbrella modules only export-import independent named modules. jt.log.core exports its own :fwd/:logger/:service interface partitions.
+- Keep logger/service in jt.log.core; shared public forward declarations live in :fwd. Keep the import graph acyclic.
+- formatter, sink and derived sinks stay independent named modules to preserve the GCC Darwin typeinfo workaround.
+- Internal cross-module named interfaces use `export module jt.detail.*;` in PRIVATE CXX_MODULES file sets.
+- Core internal partitions use `module jt.log.core:message;`, `:service_impl`, `:writer`, `:archive` in PRIVATE file sets.
+- Definitions belong to the declaring module: `module jt.log.core;`, `module jt.log.sink;`, `module jt.base.buffer;`, etc. Do not use implementation partition declarations for ordinary implementation units.
+- Import std before other imports. Imports precede exported declarations.
+- JT_API interfaces start with a global module fragment including the platform/config.h file, then export module.
+- Third-party and OS headers belong in global module fragments or internal implementation units.
 
-## Code Style Guidelines
+## Shared library / platforms
 
-### File Organization
-- **Module files:** `.cppm` extension for C++23 modules
-- **Implementation files:** `.cpp` extension
-- **Header files:** `.h` for internal config headers (`config.h`, `win32.h`)
-- Module hierarchy: independent named modules `jt.detail.*`, `jt.log.*`; `jt.log.core` still uses partitions
+- Target libjt retains PREFIX ""; jt::jt is an alias.
+- Windows/Cygwin: JT_DLL_EXPORT is library-only; BMIs bake it in. Consumers must not redefine import/export macros.
+- POSIX: JT_LIB_VISIBILITY, hidden default symbols and inlines. PUBLIC module sources get -fvisibility=default so GCC module initializers (_ZGIW*) are exported.
+- MinGW GCC: preserve --allow-multiple-definition, stdc++exp and runtime DLL copying.
+- Use jt_configure_executable for examples/tests/benchmarks so Windows runtime DLLs are colocated.
 
-### Naming Conventions
-- **Namespaces:** `jt::detail` for internals, `jt::log` for the logging API, `jt::types` for concepts
-- **Classes / structs / enums:** snake_case (e.g., `logger`, `service`, `sink_file`, `base_memory_buffer`)
-- **Methods / functions:** snake_case (e.g., `should_log`, `create_logger`)
-- **Variables:** snake_case (e.g., `max_size`, `keep_days`)
-- **Type aliases:** snake_case (e.g., `sink_ptr`, `buffer_1k`)
+## Style and ownership
 
-### C++23 Module Guidelines
-- Users may `import jt;` (`src/jt.cppm` re-exports `jt.log` and `jt.detail`). Fine-grained: `import jt.log;` / `import jt.detail;`
-- Public APIs are independent named modules (`export module jt.log.sink;`, `export module jt.detail.memory;`)
-- `src/jt.log.cppm` / `src/jt.detail.cppm` only `export import` other named modules; they must not `export import :partition`
-- `logger` / `service` / `fwd` stay partitions of `jt.log.core` (import cycle + pimpl). Polymorphic types (`formatter`, `sink`, derived sinks) are separate named modules so GCC Darwin will not duplicate their typeinfo
-- Internal modules used across named modules are `export module jt.detail.os;` (etc.) in the PRIVATE file set; do not put them in PUBLIC
-- `jt.log.core` implementation partitions `:message` and `:service_impl` are in the PRIVATE file set (`module jt.log.core:message;`, not `export module`)
-- Implementation units belong to the module that declared the type (`module jt.log.sink;`, `module jt.log.core;`, not a shared `module jt;`)
-- Public interface units must not import PRIVATE modules
-- Import dependencies before exports: `import std;` first
-- Interface units that need `JT_API`: start with a global module fragment (`module;` then `#include` `detail/config.h`, then `export module ...`)
+- Follow .clang-format (Google style, 2 spaces); snake_case for classes, methods, variables and aliases.
+- Public foundation namespace: jt::base. Logging: jt::log. Foundation internals: jt::detail.
+- Use std explicit-width integer types and std::string_view for borrowed text.
+- Use jt::base::allocator-backed containers and custom unique_ptr/dynamic_unique_ptr. dynamic_deleter requires a virtual base destructor.
+- Preserve exception containment in logging, noexcept destruction and low-level semantics.
+- Keep template definitions in reachable module interfaces; place non-template implementation next to its interface.
+- Do not rewrite queue algorithms, memory ordering or buffer behavior as incidental cleanup.
 
-### Formatting
-- Follow Google style (configured in `.clang-format`)
-- Use 2 spaces for indentation
-- Line length: ~120 characters
-- Braces on same line for functions/classes
+## Logging lifecycle
 
-### Error Handling
-- Use exceptions for recoverable errors in logging
-- Noexcept for destructors and critical low-level operations
-- Try-catch blocks in log functions to prevent logging failures from cascading
-- Return empty/invalid state on error rather than throwing in destructors
+- Construct jt::log::service to start workers; request_stop closes async submissions. Destruction also waits for workers.
+- Only service::create_logger constructs logger; it takes a movable sink range and returns std::shared_ptr<logger>.
+- Helpers take logger&, e.g. jt::log::info(*log, "value {}", value); runtime format uses vinfo/vwarn/etc.
+- Levels: trace, debug, info, warn, error, critical. Preserve source_location call-site capture.
+- service_impl owns registry and coordinates lifetime. writer_backend owns queue/submission/dispatch; archive_worker owns compression/retention.
+- Shutdown: close submissions -> drain writer -> notify archive stop -> drain archive -> join. Preserve startup-failure cleanup.
+- writer_backend has private logger backend access through friendship; do not export backend methods.
+- logger backend links and service::lz4_client are weak handles. Retaining logger does not retain service.
+- File sink owns rotation and manifest state. Only remove source logs after a complete archive has been successfully published.
 
-### Memory Management
-- Use custom allocator-based containers from `jt::detail`
-- `allocator<T>` for all standard library containers
-- Custom smart pointers: `unique_ptr`, `dynamic_unique_ptr` (`dynamic_deleter` requires a virtual destructor on the base)
-- Memory statistics via `allocated_memory()`, `allocated_size()`
+## Future architecture (not yet implemented)
 
-### Logging API
-- Construct `jt::log::service` to start backend threads; call `request_stop()` when finished (destructor also requests stop)
-- Loggers are created only via `service::create_logger` (`logger::ctor_key` is not user-constructible)
-- `create_logger` takes a movable sink range (e.g. `std::array`) and returns `std::shared_ptr<logger>`
-- Pass `logger&` (dereference the shared_ptr) to log helpers: `jt::log::info(log, "msg {}", arg);`
-- **Variable argument logging:** `jt::log::vinfo(log, fmt, args...);` (`fmt` is `std::string_view`)
-- **Log levels:** trace, debug, info, warn, error, critical
-- **Structured logging:** Use source_location for file/line info
-- Thread-safe: All log functions are thread-safe
-- `sink_file` holds a `service::lz4_client` (weak handle); it becomes a no-op after `service` is destroyed
-
-### Import Conventions
-- User code: `import jt;` or `import jt.log;` / `import jt.detail;`
-- Standard library: `import std;`
-- Other named modules: `import jt.log.sink;` / `import jt.detail.os;`
-- `jt.log.core` partitions only: `import :fwd;` / `import :logger;` / `import :service;` / `import :message;` / `import :service_impl;`
-- PRIVATE named modules (`jt.detail.os`, `jt.log.default_formatter`, queues, string, …) may only be imported by implementation units and other internal modules
-
-### Type Definitions
-- Use `std::uint32_t`, `std::int64_t` for explicit-width integers
-- `std::string_view` for read-only string parameters
-- `std::shared_ptr` for shared ownership (e.g., logger)
-- `detail::dynamic_unique_ptr` for polymorphic unique pointers
-- `std::format_string<Args...>` for format string type safety
-
-### Module Structure
-- **Umbrella:** `src/jt.cppm` (`export module jt;`) re-exports `jt.log` and `jt.detail`
-- **Public named modules:** listed in `JT_PUBLIC_MODULES`. Barrels `src/jt.log.cppm` and `src/jt.detail.cppm` re-export them
-- **`jt.log.core` public partitions** (PUBLIC file set): `:fwd`, `:logger`, `:service` — exported by `src/log/core.cppm`
-- **`jt.log.core` implementation partitions** (PRIVATE file set): `:message`, `:service_impl`
-- **Internal named modules:** remaining files in `JT_PRIVATE_MODULES`; `export module` so other library units can import them, PRIVATE so BMIs are not propagated
-- **Impl files:** `src/detail/impl/*.cpp`, `src/log/impl/*.cpp` use the matching named module (`module jt.log.sink;`, `module jt.log.core;`, `module jt.detail.buffer;`, …)
-
-## Cursor/Copilot Rules
-
-**No specific rules file found.** Project relies on:
-- `.clang-format` with `BasedOnStyle: Google`
-- C++23 module best practices
-- Project-specific conventions documented above
-
-## Quick Start for AI Agents
-
-1. **Understanding the codebase:** `src/jt.cppm` is the umbrella; `src/jt.log.cppm` and `src/jt.detail.cppm` are the domain barrels
-2. **Modifying logging:** Edit files in `src/log/` directory
-3. **Adding data structures:** Add to `src/detail/` with corresponding `.cppm` files; put public APIs in `JT_PUBLIC_MODULES` and internals in `JT_PRIVATE_MODULES`
-4. **Testing changes:** Run `./build/main` to verify no regressions
-5. **Code style:** Follow existing patterns, use `clang-format` to verify
-
-## Project Goals
-
-- High-performance server framework with focus on low latency
-- C++23 modules for fast compilation and clear dependencies
-- Memory efficiency via mimalloc integration
-- Zero-cost abstractions for production use
+- jt.async, jt.net and jt.actor all depend on jt.log and jt.base. Logging never depends on these domains.
+- net depends on async; actor depends on async but not net; actor.net bridges both.
+- Inject std::shared_ptr<jt::log::logger> at component construction. Application owns the log service and destroys it last.
+- Actor is optional; generic async/network usage must not require it.
+- Add JT_ENABLE_ASYNC/NET/ACTOR only when implementing those domains, default OFF. NET/ACTOR require ASYNC; both NET and ACTOR enable actor.net.
+- Do not add placeholder modules or invent scheduler/message wire formats during structural work.
+- Update docs/architecture.md, docs/migration.md and README.md with public changes.
