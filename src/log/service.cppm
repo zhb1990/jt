@@ -2,15 +2,15 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.service;
+export module jt.log.core:service;
 
 import std;
-import :detail.memory;
-import :detail.buffer;
-import :detail.vector;
-import :log.level;
-import :log.sink;
-import :log.fwd;
+import jt.detail.memory;
+import jt.detail.buffer;
+import jt.detail.vector;
+import jt.log.level;
+import jt.log.sink;
+import :fwd;
 
 namespace jt::log {
 class service_impl;
@@ -122,8 +122,25 @@ class service {
   JT_API auto create_logger(const std::string_view& name, bool async,
                             detail::vector<sink_ptr> sinks) -> logger_sptr;
 
+  /**
+   * 给文件 Sink 用的弱引用句柄：service 销毁后调用会自行失效。
+   */
+  class lz4_client {
+   public:
+    JT_API void post(const std::filesystem::path& file_name,
+                     std::string_view lz4_directory) const;
+    JT_API void clear(std::string_view name, std::string_view lz4_directory,
+                      std::uint32_t keep_days) const;
+
+   private:
+    friend class service;
+    explicit lz4_client(std::weak_ptr<void> impl) : impl_(std::move(impl)) {}
+    std::weak_ptr<void> impl_;
+  };
+
+  [[nodiscard]] JT_API auto make_lz4_client() const -> lz4_client;
+
  private:
-  friend class sink_file;
   friend class logger;
 
   auto get_impl() -> std::shared_ptr<service_impl>;

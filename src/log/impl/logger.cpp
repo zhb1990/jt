@@ -1,13 +1,15 @@
-// module jt:log.logger;
-module jt;
+module jt.log.core;
 
 import std;
-import :detail.os;
-import :detail.string;
-import :detail.vector;
-import :log.message;
-import :log.record;
-import :log.service_impl;
+import jt.detail.os;
+import jt.detail.string;
+import jt.detail.vector;
+import jt.detail.buffer;
+import jt.detail.memory;
+import :message;
+import jt.log.level;
+import jt.log.record;
+import :service_impl;
 
 namespace jt::log {
 

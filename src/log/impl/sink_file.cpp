@@ -2,12 +2,14 @@ module;
 
 #include <rapidjson/document.h>
 
-// module jt:log.sink.file;
-module jt;
+module jt.log.sink.file;
 
 import std;
-import :detail.string;
-import :log.service_impl;
+import jt.detail.string;
+import jt.detail.buffer;
+import jt.detail.memory;
+import jt.log.core;
+import jt.log.level;
 
 namespace jt::log {
 
@@ -22,9 +24,9 @@ class sink_file_imp {
    * @param s 日志服务引用
    * @param config 文件日志配置
    */
-  explicit sink_file_imp(std::shared_ptr<service_impl> s,
+  explicit sink_file_imp(service::lz4_client lz4,
                          const sink_file_config& config)
-      : service_(s),
+      : lz4_(std::move(lz4)),
         max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
@@ -75,9 +77,7 @@ class sink_file_imp {
 
       // 清理过期的压缩日志文件
       if (keep_days_ > 0 && old_day > 0) {
-        if (auto s = service_.lock()) {
-          s->clear_lz4(name_, lz4_directory_, keep_days_);
-        }
+        lz4_.clear(name_, lz4_directory_, keep_days_);
       }
     }
 
@@ -182,9 +182,7 @@ class sink_file_imp {
       file_.close();
       file_size_ = 0;
       // 触发当前日志文件的LZ4压缩
-      if (auto s = service_.lock()) {
-        s->post_lz4(file_name_, lz4_directory_);
-      }
+      lz4_.post(file_name_, lz4_directory_);
     }
 
     // 计算今天的日期（用于命名新日志文件）
@@ -236,8 +234,7 @@ class sink_file_imp {
     file_.open(file_name_, std::ios::binary | std::ios::app);
   }
 
-  // 服务引用
-  std::weak_ptr<service_impl> service_;
+  service::lz4_client lz4_;
   // 日志文件基础名称
   detail::string name_{};
   // 日志文件目录
@@ -274,7 +271,7 @@ class sink_file_imp {
  * 通过PIMPL idiom隐藏实现细节
  */
 sink_file::sink_file(service& s, const sink_file_config& config)
-    : impl_(detail::make_unique<sink_file_imp>(s.get_impl(), config)) {}
+    : impl_(detail::make_unique<sink_file_imp>(s.make_lz4_client(), config)) {}
 
 sink_file::~sink_file() noexcept = default;
 

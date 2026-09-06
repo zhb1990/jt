@@ -2,18 +2,17 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.sink;
+export module jt.log.sink;
 
 import std;
-import :detail.buffer;
-import :detail.memory;
-import :log.level;
-import :log.fwd;
-import :log.record;
+import jt.detail.buffer;
+import jt.detail.memory;
+import jt.log.level;
+import jt.log.formatter;
+import jt.log.record;
 
 namespace jt::log {
 class sink_impl;
-class logger_impl;
 }  // namespace jt::log
 
 export namespace jt::log {
@@ -59,6 +58,12 @@ class JT_API sink {
    */
   void set_formatter(formatter_ptr ptr);
 
+  /**
+   * 处理一条日志记录并写入
+   * @param record 只读日志记录
+   */
+  void consume(const log_record_view& record);
+
  protected:
   /**
    * 写入日志数据（纯虚函数）
@@ -81,11 +86,7 @@ class JT_API sink {
   virtual void flush_unlock() = 0;
 
  private:
-  friend class logger;
-  friend class logger_impl;
   friend class sink_impl;
-
-  void consume(const log_record_view& record);
 
   /** Pimpl idiom实现指针 */
   detail::unique_ptr<sink_impl> impl_;

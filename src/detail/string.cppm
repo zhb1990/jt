@@ -1,9 +1,9 @@
-module jt:detail.string;
+export module jt.detail.string;
 
 import std;
-import :detail.memory;
+import jt.detail.memory;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 using string = std::basic_string<char, std::char_traits<char>, allocator<char>>;
 

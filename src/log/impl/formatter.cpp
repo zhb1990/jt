@@ -1,4 +1,4 @@
-module jt;
+module jt.log.formatter;
 
 namespace jt::log {
 

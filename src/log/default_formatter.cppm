@@ -1,15 +1,15 @@
 // 默认日志格式化器实现
 // 提供默认的日志格式化功能，包括时间戳、日志级别、线程ID等
 
-module jt:log.default_formatter;
+export module jt.log.default_formatter;
 
 import std;
-import :detail.buffer;
-import :log.level;
-import :log.formatter;
-import :log.record;
+import jt.detail.buffer;
+import jt.log.level;
+import jt.log.formatter;
+import jt.log.record;
 
-namespace jt::log {
+export namespace jt::log {
 
 /**
  * 计算时间小数部分

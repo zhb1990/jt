@@ -2,7 +2,7 @@ module;
 
 #include "config.h"
 
-export module jt:detail.memory;
+export module jt.detail.memory;
 
 import std;
 

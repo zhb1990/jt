@@ -2,15 +2,13 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.sink.console;
+export module jt.log.sink.console;
 
 import std;
-import :log.sink;
-import :detail.memory;
-
-namespace jt::log {
-class sink_console_impl;
-}
+import jt.log.sink;
+import jt.log.level;
+import jt.detail.memory;
+import jt.detail.buffer;
 
 export namespace jt::log {
 
@@ -49,10 +47,6 @@ class JT_API sink_stdout final : public sink {
    * 确保所有缓冲的数据都被输出
    */
   void flush_unlock() override;
-
- private:
-  /** 控制台Sink实现类的引用 */
-  sink_console_impl& impl_;
 };
 
 /**
@@ -90,10 +84,6 @@ class JT_API sink_stderr final : public sink {
    * 确保所有缓冲的数据都被输出
    */
   void flush_unlock() override;
-
- private:
-  /** 控制台Sink实现类的引用 */
-  sink_console_impl& impl_;
 };
 
 /**

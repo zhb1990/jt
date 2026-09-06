@@ -1,9 +1,10 @@
-module jt:log.message;
+module jt.log.core:message;
 
 import std;
-import :detail.buffer;
-import :log.record;
-import :log.fwd;
+import jt.detail.buffer;
+import jt.log.level;
+import jt.log.record;
+import :fwd;
 
 namespace jt::log {
 

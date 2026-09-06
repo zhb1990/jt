@@ -23,7 +23,7 @@ module;
 #include <unistd.h>
 #endif
 
-module jt;
+module jt.detail.os;
 
 import std;
 

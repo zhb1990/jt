@@ -1,7 +1,7 @@
-export module jt:log.record;
+export module jt.log.record;
 
 import std;
-import :log.level;
+import jt.log.level;
 
 export namespace jt::log {
 

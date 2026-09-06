@@ -2,11 +2,11 @@ module;
 
 #include <cassert>
 
-module jt:detail.intrusive_mpsc_queue;
+export module jt.detail.intrusive_mpsc_queue;
 
 import std;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 /**
  * 无锁多生产者单消费者(MPSC)队列

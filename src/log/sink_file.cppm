@@ -2,12 +2,14 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.sink.file;
+export module jt.log.sink.file;
 
 import std;
-import :log.sink;
-import :log.fwd;
-import :detail.memory;
+import jt.log.sink;
+import jt.log.core;
+import jt.log.level;
+import jt.detail.memory;
+import jt.detail.buffer;
 
 namespace jt::log {
 class sink_file_imp;

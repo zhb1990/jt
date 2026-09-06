@@ -1,7 +1,7 @@
-export module jt:detail.vector;
+export module jt.detail.vector;
 
 import std;
-import :detail.memory;
+import jt.detail.memory;
 
 export namespace jt::detail {
 

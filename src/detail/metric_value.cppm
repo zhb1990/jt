@@ -1,9 +1,9 @@
-module jt:detail.metric_value;
+export module jt.detail.metric_value;
 
 import std;
-import :detail.cache_line;
+import jt.detail.cache_line;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 /**
  * 线程局部计数器

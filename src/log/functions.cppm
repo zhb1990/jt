@@ -8,9 +8,12 @@
  * trace)和可变参数日志(vlog, vcritical, verror, vwarn, vinfo, vtrace)
  */
 
-export module jt:log.functions;
+export module jt.log.functions;
 
-import :log.logger;
+import std;
+import jt.log.core;
+import jt.log.level;
+import jt.detail.buffer;
 
 namespace jt::log {
 

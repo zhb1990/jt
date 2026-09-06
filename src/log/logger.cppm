@@ -2,15 +2,16 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.logger;
+export module jt.log.core:logger;
 
 import std;
-import :detail.memory;
-import :detail.buffer;
-import :detail.vector;
-import :log.sink;
-import :log.fwd;
-import :log.record;
+import jt.detail.memory;
+import jt.detail.buffer;
+import jt.detail.vector;
+import jt.log.sink;
+import jt.log.level;
+import :fwd;
+import jt.log.record;
 
 namespace jt::log {
 class logger_impl;

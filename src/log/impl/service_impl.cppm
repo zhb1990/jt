@@ -2,20 +2,20 @@ module;
 
 #include <lz4frame.h>
 
-module jt:log.service_impl;
+module jt.log.core:service_impl;
 
 import std;
-import :detail.memory;
-import :detail.buffer;
-import :detail.vector;
-import :detail.string;
-import :detail.deque;
-import :detail.unordered_map;
-import :detail.intrusive_mpsc_queue;
-import :log.level;
-import :log.sink;
-import :log.fwd;
-import :log.message;
+import jt.detail.memory;
+import jt.detail.buffer;
+import jt.detail.vector;
+import jt.detail.string;
+import jt.detail.deque;
+import jt.detail.unordered_map;
+import jt.detail.intrusive_mpsc_queue;
+import jt.log.level;
+import jt.log.sink;
+import :fwd;
+import :message;
 
 namespace jt::log {
 

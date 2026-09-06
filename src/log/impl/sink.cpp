@@ -1,9 +1,11 @@
-// module jt:log.sink;
-module jt;
+module jt.log.sink;
 
 import std;
-import :log.record;
-import :log.default_formatter;
+import jt.log.level;
+import jt.log.record;
+import jt.log.default_formatter;
+import jt.detail.buffer;
+import jt.detail.memory;
 
 namespace jt::log {
 

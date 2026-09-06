@@ -2,10 +2,10 @@ module;
 
 #include "config.h"
 
-export module jt:detail.buffer;
+export module jt.detail.buffer;
 
 import std;
-import :detail.memory;
+import jt.detail.memory;
 
 export namespace jt::detail {
 

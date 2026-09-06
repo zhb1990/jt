@@ -2,10 +2,9 @@ module;
 
 #include <mimalloc.h>
 
-// module jt:detail.memory;
-module jt;
+module jt.detail.memory;
 
-import :detail.metric_value;
+import jt.detail.metric_value;
 
 namespace jt::detail {
 

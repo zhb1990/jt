@@ -2,11 +2,11 @@ module;
 
 #include "../detail/config.h"
 
-export module jt:log.formatter;
+export module jt.log.formatter;
 
 import std;
-import :detail.buffer;
-import :log.record;
+import jt.detail.buffer;
+import jt.log.record;
 
 export namespace jt::log {
 

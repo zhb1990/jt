@@ -8,10 +8,11 @@ module;
 #include <cstdio>
 #endif
 
-// module jt:log.sink.console;
-module jt;
+module jt.log.sink.console;
 
 import std;
+import jt.log.level;
+import jt.detail.buffer;
 
 namespace jt::log {
 
@@ -63,6 +64,8 @@ bool is_color_terminal() noexcept {
 bool in_terminal(std::FILE* file) { return ::isatty(::fileno(file)) != 0; }
 
 #endif
+
+namespace {
 
 /**
  * 控制台日志Sink的实现类
@@ -282,11 +285,13 @@ sink_console_impl console_stdout(stdout);
 sink_console_impl console_stderr(stderr);
 #endif
 
+}  // namespace
+
 /**
  * 标准输出Sink类
  * 将日志输出到stdout
  */
-sink_stdout::sink_stdout() : impl_(console_stdout) {}
+sink_stdout::sink_stdout() = default;
 
 sink_stdout::~sink_stdout() noexcept = default;
 
@@ -302,19 +307,19 @@ void sink_stdout::write(const level lv, const time_point&,
                         const detail::buffer_1k& buf,
                         const std::size_t color_start,
                         const std::size_t color_stop) {
-  return impl_.write(lv, buf, color_start, color_stop);
+  return console_stdout.write(lv, buf, color_start, color_stop);
 }
 
 /**
  * 刷新标准输出缓冲区
  */
-void sink_stdout::flush_unlock() { return impl_.flush_unlock(); }
+void sink_stdout::flush_unlock() { return console_stdout.flush_unlock(); }
 
 /**
  * 标准错误Sink类
  * 将日志输出到stderr
  */
-sink_stderr::sink_stderr() : impl_(console_stderr) {}
+sink_stderr::sink_stderr() = default;
 
 sink_stderr::~sink_stderr() noexcept = default;
 
@@ -330,13 +335,13 @@ void sink_stderr::write(const level lv, const time_point&,
                         const detail::buffer_1k& buf,
                         const std::size_t color_start,
                         const std::size_t color_stop) {
-  return impl_.write(lv, buf, color_start, color_stop);
+  return console_stderr.write(lv, buf, color_start, color_stop);
 }
 
 /**
  * 刷新标准错误缓冲区
  */
-void sink_stderr::flush_unlock() { return impl_.flush_unlock(); }
+void sink_stderr::flush_unlock() { return console_stderr.flush_unlock(); }
 
 /**
  * 写入数据到标准输出（信息级别）

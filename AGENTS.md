@@ -26,7 +26,7 @@
 - **Module files:** `.cppm` extension for C++23 modules
 - **Implementation files:** `.cpp` extension
 - **Header files:** `.h` for internal config headers
-- Module hierarchy: `jt:detail.*`, `jt:log.*`
+- Module hierarchy: `jt.detail.*`, `jt.log.*` (independent named modules; `jt.log.core` still uses partitions)
 
 ### Naming Conventions
 - **Namespaces:** `jt::detail` for internals, `jt::log` for public API
@@ -36,12 +36,13 @@
 - **Type aliases:** snake_case (e.g., `sink_ptr`)
 
 ### C++23 Module Guidelines
-- Keep a single named module `jt`. Users only `import jt;`
-- Public interface partitions: `export module jt:name;` and `export namespace`
-- Internal implementation partitions: `module jt:name;` (no `export`) and a non-exported namespace
-- `jt.cppm` must `export import` every public partition (direct or indirect); never `export import` internal partitions
-- Public partitions must not import internal partitions
-- Implementation units stay `module jt;`
+- Users `import jt.log;` and `import jt.detail;` (no umbrella `jt`)
+- Public APIs are independent named modules (`export module jt.log.sink;`, `export module jt.detail.memory;`)
+- `src/jt.log.cppm` / `src/jt.detail.cppm` only `export import` other named modules; they must not `export import :partition`
+- `logger` / `service` stay partitions of `jt.log.core` (import cycle + pimpl). Polymorphic types (`formatter`, `sink`, derived sinks) are separate named modules so GCC Darwin will not duplicate their typeinfo
+- Internal modules used across named modules are `export module jt.detail.os;` (etc.) in the PRIVATE file set; do not put them in PUBLIC
+- Implementation units belong to the module that declared the type (`module jt.log.sink;`, not a shared `module jt;`)
+- Public interface units must not import PRIVATE modules
 - Import dependencies before exports: `import std;` first
 
 ### Formatting
@@ -73,10 +74,11 @@
 - Thread-safe: All log functions are thread-safe
 
 ### Import Conventions
-- User code: `import jt;` only
+- User code: `import jt.log;` / `import jt.detail;`
 - Standard library: `import std;`
-- Same-module partitions: `import :log.logger;` / `import :detail.buffer;`
-- Internal partitions (`:log.message`, `:detail.os`, queues, etc.) may only be imported by implementation units and other internal partitions
+- Other named modules: `import jt.log.sink;` / `import jt.detail.os;`
+- `jt.log.core` partitions only: `import :fwd;` / `import :message;` / `import :service_impl;`
+- PRIVATE named modules (`jt.log.message` is a core partition; `jt.detail.os`, `jt.log.default_formatter`, …) may only be imported by implementation units and other internal modules
 
 ### Type Definitions
 - Use `std::uint32_t`, `std::int64_t` for explicit-width integers
@@ -86,9 +88,9 @@
 - `std::format_string<Args...>` for format string type safety
 
 ### Module Structure
-- **Public partitions:** listed in `JT_PUBLIC_MODULES` and `export import`ed by `src/jt.cppm`
-- **Internal partitions:** listed in `JT_PRIVATE_MODULES`; `module jt:xxx;` without `export`
-- **Impl files:** `src/detail/impl/*.cpp`, `src/log/impl/*.cpp` use `module jt;`
+- **Public named modules:** listed in `JT_PUBLIC_MODULES`; barrels `src/jt.log.cppm` and `src/jt.detail.cppm` re-export them
+- **Internal named modules:** listed in `JT_PRIVATE_MODULES`; `export module` so other library units can import them, PRIVATE so BMIs are not propagated
+- **Impl files:** `src/detail/impl/*.cpp`, `src/log/impl/*.cpp` use the matching named module (`module jt.log.sink;`, `module jt.log.core;`, …)
 
 ## Cursor/Copilot Rules
 
@@ -99,7 +101,7 @@
 
 ## Quick Start for AI Agents
 
-1. **Understanding the codebase:** Focus on `jt.cppm` as the main module export point
+1. **Understanding the codebase:** Focus on `src/jt.log.cppm` and `src/jt.detail.cppm` as the public import points
 2. **Modifying logging:** Edit files in `src/log/` directory
 3. **Adding data structures:** Add to `src/detail/` with corresponding `.cppm` files
 4. **Testing changes:** Run `./build/main` to verify no regressions

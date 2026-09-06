@@ -4,11 +4,11 @@
  * 实际实现位于 src/detail/impl/os.cpp
  */
 
-module jt:detail.os;
+export module jt.detail.os;
 
 import std;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 /**
  * 获取当前进程ID

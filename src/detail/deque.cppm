@@ -1,9 +1,9 @@
-module jt:detail.deque;
+export module jt.detail.deque;
 
 import std;
-import :detail.memory;
+import jt.detail.memory;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 template <class T, class Allocator = allocator<T>>
 using deque = std::deque<T, Allocator>;

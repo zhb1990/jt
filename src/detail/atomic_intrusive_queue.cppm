@@ -8,13 +8,13 @@ module;
 
 #include <cassert>
 
-module jt:detail.atomic_intrusive_queue;
+export module jt.detail.atomic_intrusive_queue;
 
 import std;
-import :detail.cache_line;
-import :detail.intrusive_queue;
+import jt.detail.cache_line;
+import jt.detail.intrusive_queue;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 /**
  * 原子侵入式队列模板

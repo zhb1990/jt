@@ -23,6 +23,8 @@ find_package(mimalloc CONFIG REQUIRED)
 
 set(JT_PUBLIC_MODULES
     "src/jt.cppm"
+    "src/jt.log.cppm"
+    "src/jt.detail.cppm"
 
     "src/types/writable_buffer.cppm"
 
@@ -30,6 +32,7 @@ set(JT_PUBLIC_MODULES
     "src/detail/buffer.cppm"
     "src/detail/vector.cppm"
 
+    "src/log/core.cppm"
     "src/log/fwd.cppm"
     "src/log/level.cppm"
     "src/log/record.cppm"
@@ -107,6 +110,11 @@ else()
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
+    # Consumers that `import` a named module need its GCC initializer exported
+    # from the DSO. CXX_VISIBILITY_PRESET hidden would otherwise make _ZGIW*
+    # local and break linking of main / downstream targets.
+    set_property(SOURCE ${JT_PUBLIC_MODULES} APPEND PROPERTY
+        COMPILE_OPTIONS -fvisibility=default)
 endif()
 
 if(MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

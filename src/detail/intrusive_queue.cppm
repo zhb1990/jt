@@ -2,11 +2,11 @@ module;
 
 #include <cassert>
 
-module jt:detail.intrusive_queue;
+export module jt.detail.intrusive_queue;
 
 import std;
 
-namespace jt::detail {
+export namespace jt::detail {
 
 // https://github.com/NVIDIA/stdexec/blob/main/include/stdexec/__detail/__intrusive_queue.hpp
 template <auto Next>

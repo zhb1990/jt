@@ -1,4 +1,4 @@
-export module jt:types.writable_buffer;
+export module jt.types.writable_buffer;
 
 import std;
 

@@ -2,16 +2,19 @@ module;
 
 #include <lz4frame.h>
 
-module jt;
+module jt.log.core;
 
 import std;
 
-import :detail.os;
-import :detail.string;
-import :detail.unordered_map;
-import :detail.cpu_pause;
-import :log.message;
-import :log.service_impl;
+import jt.detail.os;
+import jt.detail.buffer;
+import jt.log.level;
+import jt.log.sink.console;
+import jt.detail.string;
+import jt.detail.unordered_map;
+import jt.detail.cpu_pause;
+import :message;
+import :service_impl;
 
 namespace jt::log {
 

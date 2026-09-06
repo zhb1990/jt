@@ -2,8 +2,7 @@ module;
 
 #include "../config.h"
 
-// module jt:detail.buffer;
-module jt;
+module jt.detail.buffer;
 
 namespace jt::detail {
 

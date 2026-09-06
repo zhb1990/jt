@@ -1,4 +1,4 @@
-export module jt:log.level;
+export module jt.log.level;
 
 import std;
 

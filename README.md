@@ -12,7 +12,7 @@ JT 是一个现代 C++23 编写的轻量级服务器框架，参考了 skynet �
 **核心特性**：
 - 🚀 基于 mimalloc 的高性能内存管理
 - 📝 高性能日志系统（异步写入、文件轮转、LZ4 压缩）
-- 📦 单模块入口 `import jt;`，内部 partition 不进入公开接口
+- 📦 公开入口 `import jt.log;` / `import jt.detail;`，内部模块不进入公开 FILE_SET
 - ⚡ 零成本抽象
 
 ## 技术栈
@@ -26,14 +26,15 @@ JT 是一个现代 C++23 编写的轻量级服务器框架，参考了 skynet �
 | **网络** | asio - 跨平台异步 I/O |
 | **数据格式** | RapidJSON - 高性能 JSON 解析 |
 
-用户入口只有 `import jt;`。公开 interface partition 由 `jt.cppm` 全部 `export import`；内部 implementation partition 使用 `module jt:xxx;`（无 `export`），不会进入公开模块接口。无锁队列、字符串、哈希表等容器属于内部 partition，不能通过 `import jt;` 使用。
+用户入口是 `import jt.log;` 与 `import jt.detail;`。`src/jt.log.cppm` / `src/jt.detail.cppm` 只 `export import` 独立命名模块，不再用主模块 `export import` 分区（避免 GCC Darwin 上虚类型 typeinfo 重复）。`logger` / `service` 因循环依赖留在 `jt.log.core` 分区中；`formatter` / `sink` 及其派生类是独立命名模块。无锁队列、字符串、哈希表等属于 PRIVATE 命名模块，不能通过公开入口使用。
 
 ## 项目结构
 
 ```
 jt/
 ├── src/
-│   ├── jt.cppm                      # 主模块导出（仅公开 partition）
+│   ├── jt.log.cppm                  # 公开入口：export import 日志命名模块
+│   ├── jt.detail.cppm               # 公开入口：export import 内存/缓冲区命名模块
 │   ├── main.cpp                     # 示例程序入口
 │   │
 │   ├── detail/                      # 底层模块
@@ -57,8 +58,9 @@ jt/
 │   │       └── os.cpp               # OS 实现
 │   │
 │   ├── log/                         # 日志系统
+│   │   ├── core.cppm                # jt.log.core 主接口（logger/service 分区）
 │   │   ├── level.cppm               # 公开：日志级别
-│   │   ├── fwd.cppm                 # 公开：前向声明
+│   │   ├── fwd.cppm                 # 公开：logger/service 前向声明
 │   │   ├── record.cppm              # 公开：log_record_view
 │   │   ├── formatter.cppm           # 公开：格式化器接口
 │   │   ├── sink.cppm                # 公开：日志输出基类
@@ -93,7 +95,8 @@ jt/
 ### 1. 内存管理
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 void* ptr = jt::detail::allocate(1024);
@@ -111,7 +114,8 @@ std::println("total allocated: {}", jt::detail::allocated_memory());
 ### 2. 缓冲区处理
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 jt::detail::base_memory_buffer<1> buffer;
@@ -129,7 +133,8 @@ std::string_view view(rb);
 ### 3. 高性能日志系统
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 jt::log::service service;
@@ -223,7 +228,8 @@ build\main.exe
 ### 基础日志使用
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 int main() {
@@ -247,7 +253,8 @@ int main() {
 ### 内存管理示例
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 void* ptr = jt::detail::allocate(256);
@@ -260,7 +267,8 @@ std::println("Total memory allocated: {}", jt::detail::allocated_memory());
 ### 缓冲区使用示例
 
 ```cpp
-import jt;
+import jt.log;
+import jt.detail;
 import std;
 
 jt::detail::base_memory_buffer<1> buffer;

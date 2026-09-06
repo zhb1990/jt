@@ -1,10 +1,13 @@
 module;
 
-// module jt:log.service;
-module jt;
+module jt.log.core;
 
 import std;
-import :log.service_impl;
+import :service_impl;
+import jt.detail.string;
+import jt.detail.buffer;
+import jt.detail.memory;
+import jt.log.level;
 
 namespace jt::log {
 
@@ -61,5 +64,24 @@ auto service::create_logger(const std::string_view& name,  // NOLINT
 }
 
 auto service::get_impl() -> std::shared_ptr<service_impl> { return impl_; }
+
+auto service::make_lz4_client() const -> lz4_client {
+  return lz4_client{std::static_pointer_cast<void>(impl_)};
+}
+
+void service::lz4_client::post(const std::filesystem::path& file_name,
+                               const std::string_view lz4_directory) const {
+  if (auto p = std::static_pointer_cast<service_impl>(impl_.lock())) {
+    p->post_lz4(file_name, lz4_directory);
+  }
+}
+
+void service::lz4_client::clear(const std::string_view name,
+                                const std::string_view lz4_directory,
+                                const std::uint32_t keep_days) const {
+  if (auto p = std::static_pointer_cast<service_impl>(impl_.lock())) {
+    p->clear_lz4(detail::string{name}, lz4_directory, keep_days);
+  }
+}
 
 }  // namespace jt::log
