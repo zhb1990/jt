@@ -182,6 +182,8 @@ bool lz4_data::compress_file(std::ofstream& output, std::uint64_t& count_out,
   return !input.bad() && output.good();
 }
 
+archive_worker::archive_worker() = default;
+
 archive_worker::~archive_worker() noexcept {
   request_stop();
   wait_stop();

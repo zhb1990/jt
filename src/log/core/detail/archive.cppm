@@ -23,7 +23,7 @@ struct lz4_data {
 
 class archive_worker {
  public:
-  archive_worker() = default;
+  archive_worker();
   ~archive_worker() noexcept;
   void start();
   void request_stop();
