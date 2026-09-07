@@ -10,6 +10,7 @@ import jt.base.buffer;
 import jt.base.memory;
 import jt.log.core;
 import jt.log.level;
+import jt.log.format;
 
 namespace jt::log {
 
@@ -37,7 +38,7 @@ class sink_file_imp {
 
     // 创建清单文件路径（manifest文件用于存储日志轮换状态）
     base::buffer_1k temp;
-    std::format_to(std::back_inserter(temp), "manifest_{}.json", name_);
+    jt::log::format_to(temp, "manifest_{}.json", name_);
 
     std::u8string_view u8strv(
         reinterpret_cast<const char8_t*>(directory_.c_str()),
@@ -166,8 +167,8 @@ class sink_file_imp {
   void save_manifest() {
     std::ofstream file(manifest_path_, std::ios::binary);
     base::buffer_1k temp;
-    std::format_to(std::back_inserter(temp), R"({{ "day":{}, "seq":{} }})",
-                   manifest_.day, manifest_.seq);
+    jt::log::format_to(temp, R"({{ "day":{}, "seq":{} }})", manifest_.day,
+                       manifest_.seq);
     file.write(reinterpret_cast<const char*>(temp.begin_read()),
                static_cast<std::streamsize>(temp.readable()));
   }
@@ -210,11 +211,10 @@ class sink_file_imp {
     base::buffer_1k temp;
     // 生成日志文件名：{name}_{date}.log 或 {name}_{date}_{seq:04d}.log
     if (manifest_.seq == 0) {  // NOLINT(*-branch-clone)
-      std::format_to(std::back_inserter(temp), "{}_{}.log", name_,
-                     manifest_.day);
+      jt::log::format_to(temp, "{}_{}.log", name_, manifest_.day);
     } else {
-      std::format_to(std::back_inserter(temp), "{}_{}_{:04d}.log", name_,
-                     manifest_.day, manifest_.seq);
+      jt::log::format_to(temp, "{}_{}_{:04d}.log", name_, manifest_.day,
+                         manifest_.seq);
     }
 
     // 构建完整的文件路径

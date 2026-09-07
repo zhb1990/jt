@@ -1,8 +1,26 @@
 # 重组验证记录
 
-验证日期：2026-09-06 至 2026-09-07。所有测试均在本机 macOS arm64 执行；未将其他平台列为通过。
+验证日期：2026-09-06 至 2026-09-07。新增的 Windows 验证单列如下；后续重组及性能对比记录来自原 macOS arm64 环境。
 
-## 已完成
+## Windows MinGW 重复定义修复（2026-09-07）
+
+- Windows x64、MSYS2 UCRT64 GCC 16.2.0 Rev3 / libstdc++、GNU ld 2.47.20260726、CMake 4.4.3、Ninja。
+- 使用本机已有 vcpkg `x64-windows` 包：mimalloc 3.3.2、LZ4 1.10.0 和 RapidJSON。仅记录本机实测组合，不据此保证任意 MSVC/MinGW C++ 二进制混用。
+- 修复前复现：`__replace_rep` 同时由 archive、file、default_formatter 产生；`__tag` 同时由 service 和 service_impl 产生。后者来自归档条件变量构造时隐式 `make_shared<mutex>`。
+- `build/debug` 与 `build/release` 均从新目录配置并完整构建，分别通过 23/23 CTest；库与消费者均未启用 `--allow-multiple-definition`。原有 `build` Debug 目录也通过全部测试。
+- 新增双翻译单元消费测试，覆盖整数/浮点/字符串 debug 格式、自定义 `std::formatter`、运行时格式串、异常捕获、4096 字节消息、调用点位置、本地时间/时区偏移和默认 formatter；公开模块消费测试增加 `jt.log.format`。
+- Debug 目标文件检查确认库内 `__replace_rep` 仅在 `format.cpp.obj` 定义，`__tag` 仅在 `service.cpp.obj` 定义。
+- 示例首次在隔离目录运行暴露了原有 Windows DLL 复制遗漏：LZ4 未随 libjt 复制到消费目录。补齐 libjt 私有运行库复制后，Release 示例在独立目录运行成功，最终 JT 内存统计为 0。
+- Release 基准运行成功，同步、异步各处理 20,000 条，结束时 JT 存量增量均为 0。单次运行仅作功能检查，不与原 macOS 数据比较性能。
+- 新增及拆出的 C++ 文件通过 clang-format 检查，`git diff --check` 通过。本次未重新验证 Linux/macOS，未执行 TSAN/ASAN。
+
+首次配置使用 `--preset debug` / `--preset release`，并指定 `CMAKE_CXX_COMPILER=C:/msys64/ucrt64/bin/g++.exe`、本机 Ninja 路径、`CMAKE_TOOLCHAIN_FILE=C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake` 和 `VCPKG_TARGET_TRIPLET=x64-windows`。构建进程 PATH 包含 UCRT64 bin；之后运行 `cmake --build --preset <配置> --parallel 4` 和 `ctest --preset <配置>`。这些绝对路径仅描述本机环境。
+
+本地诊断输出保存在忽略的 `build/fix-*.txt` 与 `build/link-diagnosis.txt` 中。
+
+后续 DLL 复制修复：用户报告向 `build/tests` 复制 mimalloc 失败，检查时源文件和目录均存在。生成规则中多个测试目标会并发复制同一 DLL，且合并列表重复列出 mimalloc。现已去重、使用 `copy_if_different`，并串行化 Windows 链接及其部署步骤（编译仍并行），覆盖 vcpkg applocal 与 JT 复制之间的竞争。原 `build` 目录以 `cmake --build build --parallel 24` 构建成功，23/23 CTest 通过；生成规则检查确认部署目标使用深度为 1 的链接任务池。
+
+## 原 macOS 重组验证：已完成
 
 - GCC 16.2.0 / libstdc++、CMake 4.4.3、Ninja：Debug 干净构建通过，21/21 CTest 通过。
 - 同一 GCC 工具链的 Release 构建通过，21/21 CTest 通过；测试使用显式检查，未依赖被 NDEBUG 关闭的 assert。
@@ -26,7 +44,7 @@
 - 本机 Homebrew Clang 23.1.0 首次配置无法自动找到 libc++ 模块元数据。显式提供 `CMAKE_CXX_STDLIB_MODULES_JSON` 和匹配的 libc++ 头文件/链接目录后可配置，但完整构建仍失败：该 libc++ 缺少 `std::atomic<std::shared_ptr<T>>` 特化和 `std::chrono::zoned_time`。现有代码在重组前已使用这些能力，没有通过改变原子操作或时间语义绕过限制。
 - 原 vcpkg mimalloc 2.2.6 由 Apple Clang 编译。GCC Release 链接它时出现 `std::bad_alloc::bad_alloc()` 未定义；重构前源码同样失败。用 GCC 重建同版本 mimalloc 后，两者均能链接。依赖构建产物全部位于忽略的 build 目录，未修改 vcpkg 安装。
 - GCC Debug 使用原 vcpkg 依赖；Release 对比双方均使用 GCC 重建的 mimalloc。因此不跨 Debug/Release 比较性能。
-- Windows、Linux、x64 和 MinGW 本轮没有运行环境，不能声称已完成验证；保留对应可见性与运行库规则。
+- 原 macOS 重组验证未覆盖 Windows、Linux、x64 和 MinGW；Windows MinGW 的后续结果见本文开头，Linux 仍未验证。
 - 线程部分启动失败的回收路径进行了代码检查，但未用故障注入强制触发系统线程创建失败。未执行 TSAN 或 ASAN。
 
 本机 Release 依赖覆盖方式：

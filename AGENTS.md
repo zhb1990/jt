@@ -46,7 +46,7 @@
 - Target libjt retains PREFIX ""; jt::jt is an alias.
 - Windows/Cygwin: JT_DLL_EXPORT is library-only; BMIs bake it in. Consumers must not redefine import/export macros.
 - POSIX: JT_LIB_VISIBILITY, hidden default symbols and inlines. PUBLIC module sources get -fvisibility=default so GCC module initializers (_ZGIW*) are exported.
-- MinGW GCC: preserve --allow-multiple-definition, stdc++exp and runtime DLL copying.
+- MinGW GCC: preserve stdc++exp and runtime DLL copying.
 - Use jt_configure_executable for examples/tests/benchmarks so Windows runtime DLLs are colocated.
 
 ## Style and ownership

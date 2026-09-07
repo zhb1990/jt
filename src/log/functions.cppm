@@ -13,6 +13,7 @@ export module jt.log.functions;
 import std;
 import jt.log.core;
 import jt.log.level;
+import jt.log.format;
 import jt.base.buffer;
 
 namespace jt::log {
@@ -24,7 +25,7 @@ void write_log(std::uint32_t sid, logger& dest, level lv,
 
   try {
     base::buffer_1k buf;
-    std::forward<Format>(format)(std::back_inserter(buf));
+    std::forward<Format>(format)(buf);
     dest.log(sid, lv, buf, source);
   } catch (...) {
   }
@@ -34,8 +35,8 @@ template <level Lv, typename... Args>
 struct log {
   log(logger& dest, std::format_string<Args...> fmt, Args&&... args,
       const std::source_location& source = std::source_location::current()) {
-    write_log(0, dest, Lv, source, [&](auto&& out) {
-      std::format_to(out, fmt, std::forward<Args>(args)...);
+    write_log(0, dest, Lv, source, [&](auto& out) {
+      jt::log::format_to(out, fmt, std::forward<Args>(args)...);
     });
   }
 };
@@ -44,8 +45,8 @@ template <level Lv, typename... Args>
 struct vlog {
   vlog(logger& dest, std::string_view fmt, Args&&... args,
        const std::source_location& source = std::source_location::current()) {
-    write_log(0, dest, Lv, source, [&](auto&& out) {
-      std::vformat_to(out, fmt, std::make_format_args(args...));
+    write_log(0, dest, Lv, source, [&](auto& out) {
+      jt::log::vformat_to(out, fmt, std::make_format_args(args...));
     });
   }
 };

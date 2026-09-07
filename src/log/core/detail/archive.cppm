@@ -49,7 +49,9 @@ class archive_worker {
   std::thread lz4_thread_{};
   base::deque<lz4_message> lz4_queue_{};
   std::mutex lz4_mutex_{};
-  std::condition_variable_any lz4_cv_{};
+  // All waits use unique_lock<mutex>; avoid condition_variable_any's internal
+  // make_shared<mutex> and its additional libstdc++ control-block instantiation.
+  std::condition_variable lz4_cv_{};
   lz4_data lz4_data_;
   bool lz4_stop_requested_{false};
 };

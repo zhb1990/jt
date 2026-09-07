@@ -16,12 +16,17 @@
 | `jt.base.buffer` | read_buffer、channel_buffer、base_memory_buffer 和常用实例 |
 | `jt.base.containers` | vector、string、wstring、deque、unordered_map、unordered_multimap |
 | `jt.base.concepts` | writable_buffer |
-| `jt.log` | core、level、record、formatter、sink、sink.console、sink.file、functions |
+| `jt.log` | core、level、record、format、formatter、sink、sink.console、sink.file、functions |
+| `jt.log.format` | 向 buffer_1k 追加格式化文本，以及本地时间缓存格式化 |
 | `jt.log.core` | `:fwd`、`:logger`、`:service` 接口分区 |
 
 `jt::base` 承载公开基础 API，`jt::log` 承载日志 API，`jt::detail` 只包含内部基础实现。内部 `jt.detail.*` 的点号不表示模块继承；不存在公开 `jt.detail` 聚合入口。
 
 logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非导出前向声明与使用它的接口保持同一模块归属。`formatter`、`sink` 和派生 sink 保留独立命名模块，避免回退到项目曾遇到的 GCC Darwin 重复 typeinfo 结构。
+
+公开日志与控制台模板依赖 PUBLIC 模块 `jt.log.format`，只构造 `std::format_args`，通过非模板函数调用 `src/log/format.cpp` 中的运行时引擎。该实现单元同时负责 chrono 格式化，因为 chrono formatter 内部也会调用标准库格式化引擎。`format_local_time(timestamp, date_and_time, zone_offset)` 覆盖 128/32 字节内联缓存，按当前时区输出秒精度日期时间及 UTC 偏移。默认 formatter 的非模板成员定义位于相邻的 `detail/default_formatter.cpp`，保留原有缓存和输出行为。
+
+格式化参数仅在当前调用期间借用，不进入异步队列；队列仍保存格式化后的字节。这个边界集中 JT 的标准库实例化，不能修复用户在多个翻译单元直接调用 `std::format`、chrono formatter 或在自定义 formatter 内再次使用标准库格式化引擎时的工具链问题。
 
 ## 日志后端
 
@@ -72,6 +77,8 @@ flowchart TD
 
 ## 构建边界
 
-保留 Windows `JT_DLL_EXPORT`（BMI 固化宏）、POSIX 默认隐藏符号与公共模块初始化符号导出、MinGW 多定义及 stdc++exp 规则。消费者不得通过重新定义导入宏修改已生成 BMI。各可执行目标复制必要 Windows runtime DLL。
+保留 Windows `JT_DLL_EXPORT`（BMI 固化宏）、POSIX 默认隐藏符号与公共模块初始化符号导出、MinGW stdc++exp 规则；不放宽重复定义检查。归档 worker 使用 `std::condition_variable` 配合 `std::unique_lock<std::mutex>`，避免 `condition_variable_any` 构造时隐式 `make_shared<mutex>` 产生另一份 GCC/MinGW `__tag` 强定义。消费者不得通过重新定义导入宏修改已生成 BMI。各可执行目标复制必要 Windows runtime DLL。
 
 PUBLIC/PRIVATE 是 CMake 文件集可见性，不能仅凭 `export module` 判断是否为用户 API。模板所需依赖必须可被消费者取得；内部平台实现通过实现单元使用，不得从公共接口导入。
+
+Windows 的库及消费目标使用容量为 1 的 Ninja 链接任务池，使链接附带的 vcpkg applocal 和 JT DLL 复制步骤不会在共享输出目录中并发写同一个文件；源码编译仍可并行。JT 合并并去重消费者与 libjt 的运行库列表，使用 `copy_if_different` 复制，避免重复写入 mimalloc 等共同依赖。

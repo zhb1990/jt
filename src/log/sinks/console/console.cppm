@@ -7,6 +7,7 @@ export module jt.log.sink.console;
 import std;
 import jt.log.sink;
 import jt.log.level;
+import jt.log.format;
 import jt.base.memory;
 import jt.base.buffer;
 
@@ -109,7 +110,7 @@ template <typename... Args>
 void print_stderr(std::format_string<Args...> fmt, Args&&... args) {
   try {
     base::buffer_1k buf;
-    std::format_to(std::back_inserter(buf), fmt, std::forward<Args>(args)...);
+    jt::log::format_to(buf, fmt, std::forward<Args>(args)...);
     write_stderr(buf);
   } catch (...) {
     // 忽略所有异常以防止日志失败导致程序崩溃
@@ -127,7 +128,7 @@ template <typename... Args>
 void print_stdout(std::format_string<Args...> fmt, Args&&... args) {
   try {
     base::buffer_1k buf;
-    std::format_to(std::back_inserter(buf), fmt, std::forward<Args>(args)...);
+    jt::log::format_to(buf, fmt, std::forward<Args>(args)...);
     write_stdout(buf);
   } catch (...) {
     // 忽略所有异常以防止日志失败导致程序崩溃

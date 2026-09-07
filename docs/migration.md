@@ -34,4 +34,6 @@ CMake 消费目标推荐链接 `jt::jt`，原目标 `libjt` 保留。删除旧�
 
 ## 独立修复
 
+GCC 16.2 / MinGW 的 `import std` 重复定义通过集中格式化实现及移除不必要的 `condition_variable_any` 修复，不再使用 `--allow-multiple-definition`。现有日志调用方式不变。新增 `jt.log.format` 公开模块，由 `jt.log` 和 `jt` 再导出；需要自行格式化到 `buffer_1k` 时，可将 `std::format_to(std::back_inserter(buffer), fmt, args...)` 改为 `jt::log::format_to(buffer, fmt, args...)`。运行时格式串使用 `jt::log::vformat_to(buffer, fmt, std::make_format_args(args...))`，参数存储必须在整个调用期间有效。此处同步消费借用参数，异步日志仍提交格式化后的缓冲区。更新后需重新生成 BMI 并重建消费者。
+
 迁移前的文件回归测试暴露了原归档发布错误：`replace_extension` 原地修改临时路径，最终重命名失败仍可能删除源日志。现在保持 `.log.lz4.tmp` 与 `.log.lz4` 路径独立，验证并关闭输出后重命名，只在成功发布后删除源日志。重命名失败时保留源日志与临时归档供排查。此修复不修改轮转和保留策略。

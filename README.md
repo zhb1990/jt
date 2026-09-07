@@ -71,6 +71,8 @@ int main() {
 
 logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
 
+`import jt.log.format;` 提供向 `jt::base::buffer_1k` 追加的 `jt::log::format_to(buffer, fmt, args...)` 和 `jt::log::vformat_to(buffer, fmt, format_args)`，也由 `jt.log` 和 `jt` 再导出。前者保留编译期格式串检查，后者接受运行时格式串；二者同步格式化并向调用者传播异常，日志和控制台辅助函数继续捕获异常。运行时格式化引擎及本地时间格式化集中在单个实现单元，避免已复现的 GCC 16.2 / MinGW `import std` 重复定义，不依赖 `--allow-multiple-definition`。用户自己的标准库格式化调用及自定义 `std::formatter` 内部实现仍受工具链限制。
+
 ## 目录
 
 | 目录 | 内容 |

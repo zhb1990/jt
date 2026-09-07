@@ -15,7 +15,7 @@ export namespace jt::base {
  * 用于从内存区域读取数据，不支持写操作。
  * 维护一个读指针记录已读取的位置。
  */
-class read_buffer {
+class JT_API read_buffer {
  public:
   constexpr read_buffer() = default;
 

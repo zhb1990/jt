@@ -35,6 +35,14 @@ target_link_libraries(jt_base_consumer PRIVATE jt::jt)
 jt_configure_executable(jt_base_consumer)
 add_test(NAME modules.base_api COMMAND jt_base_consumer)
 
+# Multiple real consumers must link together without suppressing duplicate
+# definitions in either the library or the executable.
+add_executable(jt_format_consumer format_consumer.cpp format_other.cpp)
+target_link_libraries(jt_format_consumer PRIVATE jt::jt)
+jt_configure_executable(jt_format_consumer)
+add_test(NAME modules.format_api COMMAND jt_format_consumer)
+set_tests_properties(modules.format_api PROPERTIES TIMEOUT 30)
+
 # Negative consumers must fail for the named module, not an unrelated build error.
 foreach(module IN ITEMS jt.detail.os jt.detail.intrusive_mpsc_queue jt.detail)
     string(REPLACE "." "_" target "reject_${module}")
