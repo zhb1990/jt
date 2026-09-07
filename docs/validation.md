@@ -2,6 +2,30 @@
 
 验证日期：2026-09-06 至 2026-09-07。新增的 Windows 验证单列如下；后续重组及性能对比记录来自原 macOS arm64 环境。
 
+## mimalloc 3.3.2 的 GCC/macOS 模块兼容修复（2026-09-08）
+
+- macOS arm64、GCC 16.2.0 / libstdc++、macOS 26 SDK、CMake 4.4.3、Ninja 1.13.2。
+- 从官方 `v3.3.2` 标签构建 mimalloc 静态库，使用 GCC 16 C 编译器、Release、`MI_OVERRIDE=OFF`；依赖及日志保存在忽略的 `build/deps-mi3`，未替换现有 vcpkg 安装。
+- 修复前，在独立 `build/mi3-debug` 目录复现 `memory.cpp` 编译失败：`isascii`、`__istype`、`toupper` 报 `conflicting language linkage for imported declaration`。mimalloc 3.3.2 的 `<wchar.h>` 传递包含 macOS ctype 声明，随后加载 `std` 模块产生冲突。
+- 修复将 mimalloc 头文件及三项调用移至普通翻译单元 `memory_backend.cpp`；模块通过无系统头文件的私有声明调用，公开 API、异常及内存统计逻辑不变。
+- 修复后 `build/mi3-debug`、新建的 `build/mi3-release` 完整构建成功，分别通过 23/23 CTest。原 `build/debug` 使用 mimalloc 2.2.6 增量重建并通过 23/23 CTest。
+- Release 示例在临时目录运行成功，退出时 JT 内存统计为 0；Release 基准同步、异步各处理 20,000 条，`retained_bytes` 均为 0。基准仅作功能验证，未测量桥接调用的性能影响。
+- 新增桥接函数未出现在 Release dylib 的外部已定义符号列表中。相关 C++ 文件通过 clang-format 检查，`git diff --check` 通过。本次未重新验证 Windows/Linux，未覆盖 mimalloc 3.3.2 动态链接或其他 3.x 版本。
+
+复现及修复验证使用以下配置；Release 将构建目录换为 `build/mi3-release`、类型换为 `Release`，并追加 `-DJT_BUILD_BENCHMARKS=ON`：
+
+```sh
+cmake -S . -B build/mi3-debug -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-16 \
+  -DCMAKE_PREFIX_PATH="$HOME/dev/vcpkg/installed/jt-gcc16" \
+  -Dmimalloc_DIR="$PWD/build/deps-mi3/install/lib/cmake/mimalloc-3.3"
+cmake --build build/mi3-debug --parallel 4
+ctest --test-dir build/mi3-debug --output-on-failure
+```
+
+上述依赖路径仅描述本机验证环境；构建及测试日志为 `build/deps-mi3/before.log`、`after-{debug,release,v2}.log`、`test-{debug,release,v2}.log`。
+
 ## Windows MinGW 重复定义修复（2026-09-07）
 
 - Windows x64、MSYS2 UCRT64 GCC 16.2.0 Rev3 / libstdc++、GNU ld 2.47.20260726、CMake 4.4.3、Ninja。

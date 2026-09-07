@@ -22,6 +22,8 @@
 
 `jt::base` 承载公开基础 API，`jt::log` 承载日志 API，`jt::detail` 只包含内部基础实现。内部 `jt.detail.*` 的点号不表示模块继承；不存在公开 `jt.detail` 聚合入口。
 
+`jt.base.memory` 的公开定义及内存统计仍在 `memory.cpp` 模块实现中。mimalloc 调用位于普通翻译单元 `src/base/memory_backend.cpp`，该文件不导入 `std` 或 JT 模块。私有桥接头 `memory_backend.h` 不包含系统头文件，使用 `decltype(sizeof(0))` 表示大小类型；模块仅在 global module fragment 中包含该桥接头。这样将 mimalloc 3.3.2 的 `<wchar.h>` 等传递包含与 GCC 的 `std` 模块隔离，避免 macOS 系统声明的 language linkage 冲突。桥接符号不属于公开模块或 DLL API。
+
 logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非导出前向声明与使用它的接口保持同一模块归属。`formatter`、`sink` 和派生 sink 保留独立命名模块，避免回退到项目曾遇到的 GCC Darwin 重复 typeinfo 结构。
 
 公开日志与控制台模板依赖 PUBLIC 模块 `jt.log.format`，只构造 `std::format_args`，通过非模板函数调用 `src/log/format.cpp` 中的运行时引擎。该实现单元同时负责 chrono 格式化，因为 chrono formatter 内部也会调用标准库格式化引擎。`format_local_time(timestamp, date_and_time, zone_offset)` 覆盖 128/32 字节内联缓存，按当前时区输出秒精度日期时间及 UTC 偏移。默认 formatter 的非模板成员定义位于相邻的 `detail/default_formatter.cpp`，保留原有缓存和输出行为。

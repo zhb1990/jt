@@ -1,9 +1,10 @@
 module;
 
-#include <mimalloc.h>
+#include "memory_backend.h"
 
 module jt.base.memory;
 
+import std;
 import jt.detail.metric_value;
 
 namespace jt::base {
@@ -33,13 +34,13 @@ auto memory_total() -> metric_value& {
  * @return 分配的内存指针，如果分配失败返回nullptr
  */
 auto allocate(const std::size_t size) -> void* {
-  void* ptr = mi_malloc(size);  // 使用mimalloc分配内存
+  void* ptr = detail::memory_allocate(size);  // 使用mimalloc分配内存
   if (!ptr) {
     throw std::bad_alloc();  // 如果分配失败，抛出异常
   }
 
   // 获取实际分配的大小（可能包括额外的管理开销）
-  const auto real = mi_usable_size(ptr);
+  const auto real = detail::memory_usable_size(ptr);
   memory_total().fetch_add(real);  // 更新内存统计
   return ptr;
 }
@@ -50,7 +51,7 @@ auto allocate(const std::size_t size) -> void* {
  * @return 实际分配的字节数
  */
 auto allocated_size(const void* ptr) -> std::size_t {
-  return mi_usable_size(ptr);  // 使用mimalloc获取实际分配大小
+  return detail::memory_usable_size(ptr);  // 使用mimalloc获取实际分配大小
 }
 
 /**
@@ -59,9 +60,9 @@ auto allocated_size(const void* ptr) -> std::size_t {
  * @param ptr 要释放的内存指针
  */
 void deallocate(void* ptr) {
-  const auto real = mi_usable_size(ptr);  // 获取实际分配的大小
-  memory_total().fetch_sub(real);         // 更新内存统计（减去释放的内存）
-  return mi_free(ptr);                    // 使用mimalloc释放内存
+  const auto real = detail::memory_usable_size(ptr);  // 获取实际分配的大小
+  memory_total().fetch_sub(real);   // 更新内存统计（减去释放的内存）
+  return detail::memory_free(ptr);  // 使用mimalloc释放内存
 }
 
 /**

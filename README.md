@@ -33,6 +33,8 @@ ctest --preset release
 
 C++ 编译的第三方依赖也必须与所选编译器/标准库匹配。特别是 macOS 上，不应将 Apple Clang/libc++ 构建的 mimalloc 静态库直接混入 GCC/libstdc++；Debug 偶然链接成功并不代表 Release 可用。可使用匹配的 vcpkg triplet，或通过 `mimalloc_DIR` 指向同工具链构建的包。
 
+mimalloc 头文件通过普通翻译单元 `src/base/memory_backend.cpp` 隔离，避免 3.3.2 引入的 `<wchar.h>` 等系统声明与 macOS/GCC 的 `import std` 冲突。升级依赖时仍需重新构建和测试；具体版本及平台结果见 [验证记录](docs/validation.md)。
+
 使用 vcpkg 时，在首次配置追加：
 
 ```sh
