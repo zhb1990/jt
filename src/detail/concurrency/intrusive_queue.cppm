@@ -217,7 +217,7 @@ class intrusive_queue<Next> {
      * @return 当前节点指针的地址
      */
     [[nodiscard]]
-    auto operator->() const noexcept -> Node** {
+    auto operator->() const noexcept -> Node* const* {
       assert(node_ != nullptr);
       return &node_;
     }
