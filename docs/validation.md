@@ -2,6 +2,8 @@
 
 验证日期：2026-09-06 至 2026-09-07。新增的 Windows 验证单列如下；后续重组及性能对比记录来自原 macOS arm64 环境。
 
+本文记录各次验证当时的源码、预设和本机依赖配置，不代表当前分支所有改动均已复测。后续预设已默认使用 `VCPKG_ROOT`、vcpkg manifest 和 `jt-gcc16` triplet；新环境的构建步骤见 [README](../README.md#构建)，下文历史命令不能直接视为当前预设的验证结果。
+
 ## mimalloc 3.3.2 的 GCC/macOS 模块兼容修复（2026-09-08）
 
 - macOS arm64、GCC 16.2.0 / libstdc++、macOS 26 SDK、CMake 4.4.3、Ninja 1.13.2。

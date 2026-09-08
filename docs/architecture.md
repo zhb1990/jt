@@ -19,6 +19,7 @@
 | `jt.log` | core、level、record、format、formatter、sink、sink.console、sink.file、functions |
 | `jt.log.format` | 向 buffer_1k 追加格式化文本，以及本地时间缓存格式化 |
 | `jt.log.core` | `:fwd`、`:logger`、`:service` 接口分区 |
+| `jt.log.record` | `log_record_view`，供 formatter 和 sink 消费的只读记录视图 |
 
 `jt::base` 承载公开基础 API，`jt::log` 承载日志 API，`jt::detail` 只包含内部基础实现。内部 `jt.detail.*` 的点号不表示模块继承；不存在公开 `jt.detail` 聚合入口。
 
@@ -29,6 +30,8 @@ logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非�
 公开日志与控制台模板依赖 PUBLIC 模块 `jt.log.format`，只构造 `std::format_args`，通过非模板函数调用 `src/log/format.cpp` 中的运行时引擎。该实现单元同时负责 chrono 格式化，因为 chrono formatter 内部也会调用标准库格式化引擎。`format_local_time(timestamp, date_and_time, zone_offset)` 覆盖 128/32 字节内联缓存，按当前时区输出秒精度日期时间及 UTC 偏移。默认 formatter 的非模板成员定义位于相邻的 `detail/default_formatter.cpp`，保留原有缓存和输出行为。
 
 格式化参数仅在当前调用期间借用，不进入异步队列；队列仍保存格式化后的字节。这个边界集中 JT 的标准库实例化，不能修复用户在多个翻译单元直接调用 `std::format`、chrono formatter 或在自定义 formatter 内再次使用标准库格式化引擎时的工具链问题。
+
+队列消息 `message` 是私有实现。公开扩展接口使用 `formatter::format(const log_record_view&, ...)` 和 `sink::consume(const log_record_view&)`；视图中的 `payload` 借用消息内容，若需在调用结束后使用，应自行复制。
 
 ## 日志后端
 
@@ -41,7 +44,7 @@ logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非�
 
 启动时先构造 worker 状态和压缩上下文，再启动 writer，最后启动 archive。archive 线程创建失败时停止并回收 writer；worker 析构提供额外清理保证。
 
-`request_stop()` 关闭日志提交。writer 完成正在提交的消息并排空队列后通知 archive 停止，archive 排空已接收请求后退出。`wait_stop()` 按 writer、archive 顺序回收线程。成员声明保证 archive 比 writer 活得更久，注册表在 worker 回收后才释放。同步日志继续保留现有直接调用 sink 的语义。
+`service::request_stop()` 关闭异步日志提交。writer 完成正在提交的消息并排空队列后通知 archive 停止，archive 排空已接收请求后退出。service 析构时通过内部 `service_impl::wait_stop()` 按 writer、archive 顺序回收线程；`wait_stop()` 不是公开 API。成员声明保证 archive 比 writer 活得更久，注册表在 worker 回收后才释放。同步日志继续保留现有直接调用 sink 的语义。
 
 logger 消息目标与归档 client 均使用弱引用。只有调用期间临时持有后端；service 销毁后异步提交和归档请求自行失效。请求停止不等于同步 logger 被禁用，也不等于持有 logger 就持有 service。
 

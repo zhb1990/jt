@@ -13,4 +13,4 @@
 - Register modules with `jt_modules`; configure executables with `jt_configure_executable`.
 - Preserve exception safety and `noexcept` destruction. Do not change queue algorithms, memory ordering, or buffer semantics as incidental cleanup.
 - Consult [docs/architecture.md](docs/architecture.md) when changing module boundaries, platform support, or architecture; do not add speculative modules/options.
-- Update relevant documentation for public API changes: [README.md](README.md), [docs/architecture.md](docs/architecture.md), [docs/migration.md](docs/migration.md).
+- Update relevant documentation with every change, keeping instructions and descriptions consistent with the code: [README.md](README.md), [docs/architecture.md](docs/architecture.md), [docs/migration.md](docs/migration.md).

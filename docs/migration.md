@@ -1,16 +1,22 @@
-# 从 jt.detail 迁移至 jt.base
+# 从 main 迁移至当前分支
 
-本次为源码和模块名称的不兼容调整，不提供旧入口、转发模块或类型别名兼容层。共享库符号的模块归属也已变化，下游需要重新编译和链接，不可复用旧 BMI。
+以下以 `main` 的 `1f83e6d` 为基线，覆盖模块重组、日志 API 和构建配置变化。本次为源码和模块名称的不兼容调整，不提供旧入口、转发模块或类型别名兼容层。共享库符号的模块归属也已变化，下游需要重新编译和链接，不可复用旧 BMI。
 
-| 原模块 | 新模块 |
+## 模块和基础类型
+
+基线以 `jt` 的分区组织模块；当前改为独立命名模块，消费端可继续 `import jt;`，也可按需导入 `jt.base`、`jt.log` 或公开命名模块。
+
+| 原模块分区 | 当前公开模块 |
 |---|---|
-| `jt.detail` | `jt.base` |
-| `jt.detail.memory` | `jt.base.memory` |
-| `jt.detail.buffer` | `jt.base.buffer` |
-| `jt.detail.vector` | `jt.base.containers` |
-| `jt.types.writable_buffer` | `jt.base.concepts` |
+| `jt:detail.memory` | `jt.base.memory` |
+| `jt:detail.buffer` | `jt.base.buffer` |
+| `jt:detail.vector/string/deque/unordered_map` | `jt.base.containers` |
+| `jt:types.writable_buffer` | `jt.base.concepts` |
+| `jt:log.logger`、`jt:log.service` | `jt.log.core` |
+| `jt:log.formatter/sink/level/functions` | 对应的 `jt.log.formatter/sink/level/functions` |
+| `jt:log.sink.console/file` | `jt.log.sink.console/file` |
 
-原内部 string、deque、unordered_map 模块合并至公开 `jt.base.containers`，同时包含 wstring 与 unordered_multimap。
+表中斜线表示多个模块。若从分支中途的命名模块版本迁移，`jt.detail.memory/buffer` 同样改为 `jt.base.memory/buffer`，容器模块合并至 `jt.base.containers`（含 wstring、unordered_multimap），`jt.types.writable_buffer` 改为 `jt.base.concepts`。中途的 `jt.detail` 聚合入口已移除。
 
 公开基础符号从 `jt::detail` 改为 `jt::base`；`jt::types::writable_buffer` 改为 `jt::base::writable_buffer`。不要全局替换内部的 `jt::detail`：队列、OS、CPU 和统计实现仍使用该命名空间和 PRIVATE 命名模块。
 
@@ -26,14 +32,39 @@ jt::base::vector<int> values{1, 2, 3};
 static_assert(jt::base::writable_buffer<decltype(buffer)>);
 ```
 
-`import jt;` 继续可用，固定导出 base 和 log。所有日志公开模块名、`jt::log` 命名空间、create_logger、日志辅助函数及文件 sink 构造方式保留。自定义 sink/formatter 覆盖函数中的 `jt::detail::buffer_1k` 必须改为 `jt::base::buffer_1k`。
+`dynamic_deleter<Base>` 和 `make_dynamic_unique<Base, Derived>` 现在要求 Base 有虚析构函数；自定义多态基类需补齐该约束。
+
+## 日志 API
+
+`jt::log` 命名空间和文件 sink 构造方式保留，但调用方需要更新以下接口：
+
+| 基线用法 | 当前用法 |
+|---|---|
+| `service.start()` | 删除调用；构造 service 即启动工作线程 |
+| `service.stop()` | `service.request_stop()` 请求关闭异步提交；service 析构时等待排空和线程退出 |
+| 直接构造 logger | 使用 `service.create_logger(...)`，返回 `std::shared_ptr<logger>` |
+| `info(log, fmt, args...)` 等接受 shared_ptr 的辅助函数 | `info(*log, fmt, args...)`；所有级别及 `vinfo` 等运行时格式辅助函数接收 `logger&` |
+| `create_logger(name, async, sinks)` 的 vector 重载 | 传入 `std::move(sinks)`；该重载改为按值接收，范围重载仍移动范围元素 |
+| `service.post_lz4(...)`、`clear_lz4(...)` | `service.make_lz4_client()` 返回弱句柄，再调用 `post(...)`、`clear(...)` |
+| `sink::log(const message&)` | `sink::consume(const log_record_view&)` |
+| `formatter::format(const message&, ...)` | `formatter::format(const log_record_view&, ...)`，输出参数改为 `jt::base::buffer_1k&` |
+
+原通用 `jt::log::log`/`vlog` 和带 `sid` 的辅助重载不再是公开 API。固定级别使用 `trace/debug/info/warn/error/critical` 及其 `v` 版本；动态级别或自定义服务 ID 使用 `logger::log(sid, level, buffer, source)`，调用方负责级别筛选、格式化和所需的异常处理。
+
+`message` 及队列字段已成为私有实现。自定义 formatter 将 `sid/tid/point/buf` 分别改为记录视图的 `service_id/thread_id/timestamp/payload`；`lv`、`source` 保留。`payload` 是借用的 `std::string_view`，不能跨调用保留其内容引用。自定义 sink 的 `write` 参数改用 `jt::base::buffer_1k`；`write` 和 `flush_unlock` 是 protected 扩展点，外部使用 `consume` 和 `flush`。
+
+日志时间改为本地时间并输出 UTC 偏移，解析日志的程序需适配。异步 logger 和归档 client 使用弱句柄，保留它们不会延长 service 生命周期；先停止日志生产者，再销毁 service。`request_stop()` 不等待完成，也不禁用同步 logger；没有公开的 `wait_stop()`。
+
+## 构建
 
 CMake 消费目标推荐链接 `jt::jt`，原目标 `libjt` 保留。删除旧构建缓存/BMI 或使用新的构建目录，然后完整重建。示例源文件从 src 移至 examples，main 目标仍存在，输出位于 `<build>/examples/main`。
 
-本轮未实现 async、net、actor；未来模块约定见 architecture.md。当前移除 Asio 强制依赖，mimalloc/LZ4/RapidJSON 仍需安装。
+`debug`、`release`、`release-with-debug` 预设默认使用 `VCPKG_ROOT` 下的 vcpkg toolchain、仓库 `jt-gcc16` triplet 和 manifest 依赖。旧的仅设置 `CXX` 或 `CMAKE_PREFIX_PATH` 的预设用法不再足够；环境设置及自选工具链构建方式见 [README](../README.md#构建)。
+
+本轮未实现 async、net、actor；未来模块约定见 [architecture.md](architecture.md)。当前移除 Asio 强制依赖，mimalloc/LZ4/RapidJSON 仍需安装。
 
 ## 独立修复
 
-GCC 16.2 / MinGW 的 `import std` 重复定义通过集中格式化实现及移除不必要的 `condition_variable_any` 修复，不再使用 `--allow-multiple-definition`。现有日志调用方式不变。新增 `jt.log.format` 公开模块，由 `jt.log` 和 `jt` 再导出；需要自行格式化到 `buffer_1k` 时，可将 `std::format_to(std::back_inserter(buffer), fmt, args...)` 改为 `jt::log::format_to(buffer, fmt, args...)`。运行时格式串使用 `jt::log::vformat_to(buffer, fmt, std::make_format_args(args...))`，参数存储必须在整个调用期间有效。此处同步消费借用参数，异步日志仍提交格式化后的缓冲区。更新后需重新生成 BMI 并重建消费者。
+GCC 16.2 / MinGW 的 `import std` 重复定义通过集中格式化实现及移除不必要的 `condition_variable_any` 修复，不再使用 `--allow-multiple-definition`。新增 `jt.log.format` 公开模块，由 `jt.log` 和 `jt` 再导出；需要自行格式化到 `buffer_1k` 时，可将 `std::format_to(std::back_inserter(buffer), fmt, args...)` 改为 `jt::log::format_to(buffer, fmt, args...)`。运行时格式串使用 `jt::log::vformat_to(buffer, fmt, std::make_format_args(args...))`，参数存储必须在整个调用期间有效。此处同步消费借用参数，异步日志仍提交格式化后的缓冲区。更新后需重新生成 BMI 并重建消费者。
 
 迁移前的文件回归测试暴露了原归档发布错误：`replace_extension` 原地修改临时路径，最终重命名失败仍可能删除源日志。现在保持 `.log.lz4.tmp` 与 `.log.lz4` 路径独立，验证并关闭输出后重命名，只在成功发布后删除源日志。重命名失败时保留源日志与临时归档供排查。此修复不修改轮转和保留策略。

@@ -18,8 +18,11 @@
 
 参考：[CMake C++ modules 文档](https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html)。实验性 `import std` gate 随 CMake 版本变化；当前默认 gate 在本机 CMake 4.4.3 验证通过，其他版本可通过同名 CMake cache 参数覆盖。
 
+仓库预设默认使用 vcpkg manifest（`vcpkg.json`）安装依赖，并通过 `jt-gcc16` triplet 为项目和依赖选择 GCC 16。先设置 `VCPKG_ROOT` 指向已安装的 vcpkg 根目录：POSIX shell 使用 `export VCPKG_ROOT=/path/to/vcpkg`，PowerShell 使用 `$env:VCPKG_ROOT = 'C:/path/to/vcpkg'`。
+
+Windows 使用 MSYS2 UCRT64 的 `gcc.exe`/`g++.exe`，默认目录为 `C:/msys64`，可通过 `MSYS2_ROOT` 修改；macOS/Linux 从 PATH 查找 `gcc-16`/`g++-16`。预设的链式工具链会设置编译器，仅设置 `CXX` 不会覆盖它。
+
 ```sh
-# 首次配置时通过 CXX 选择编译器；依赖可通过 CMAKE_PREFIX_PATH 查找。
 cmake --preset debug
 cmake --build --preset debug
 ctest --preset debug
@@ -31,19 +34,26 @@ ctest --preset release
 ./build/release/benchmarks/jt_log_benchmark
 ```
 
+另有 `release-with-debug` 配置、构建和测试预设，使用 `RelWithDebInfo` 并启用基准，输出到 `build/release-with-debug`。`jt-gcc16` 在 Windows x64 使用动态依赖，在 macOS/Linux 按宿主架构选择 x64 或 arm64 并使用静态依赖。
+
 C++ 编译的第三方依赖也必须与所选编译器/标准库匹配。特别是 macOS 上，不应将 Apple Clang/libc++ 构建的 mimalloc 静态库直接混入 GCC/libstdc++；Debug 偶然链接成功并不代表 Release 可用。可使用匹配的 vcpkg triplet，或通过 `mimalloc_DIR` 指向同工具链构建的包。
 
 mimalloc 头文件通过普通翻译单元 `src/base/memory_backend.cpp` 隔离，避免 3.3.2 引入的 `<wchar.h>` 等系统声明与 macOS/GCC 的 `import std` 冲突。升级依赖时仍需重新构建和测试；具体版本及平台结果见 [验证记录](docs/validation.md)。
 
-使用 vcpkg 时，在首次配置追加：
+使用其他编译器或已有依赖包时，在独立构建目录手动配置，避免继承预设中的 GCC 16 triplet：
 
 ```sh
-cmake --preset debug -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake -S . -B build/custom -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_COMPILER=/path/to/compiler -DCMAKE_PREFIX_PATH=/path/to/dependencies
+cmake --build build/custom
+ctest --test-dir build/custom --output-on-failure
 ```
+
+也可在首次配置时指定自己的 vcpkg toolchain 和匹配的 triplet。切换工具链应使用新的构建目录。
 
 示例程序位于 `build/debug/examples/main`（Windows 为 `main.exe`）。示例会在工作目录写日志，建议在单独的临时目录运行。保留 `cmake --build build/debug --target main`。
 
-当前选项：`BUILD_TESTING=ON`、`JT_BUILD_EXAMPLES=ON`、`JT_BUILD_BENCHMARKS=OFF`。Release preset 将 benchmarks 打开。
+当前选项：`BUILD_TESTING=ON`、`JT_BUILD_EXAMPLES=ON`、`JT_BUILD_BENCHMARKS=OFF`。`release` 和 `release-with-debug` 预设将 benchmarks 打开。
 
 ## 消费库
 
@@ -53,6 +63,7 @@ cmake --preset debug -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/
 add_subdirectory(path/to/jt)
 add_executable(app main.cpp)
 target_link_libraries(app PRIVATE jt::jt)
+jt_configure_executable(app)
 ```
 
 ```cpp
@@ -71,7 +82,7 @@ int main() {
 }
 ```
 
-logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
+`service` 构造时启动后台线程，`request_stop()` 关闭异步提交，析构时等待写入与归档排空；无需调用 `start()`，也没有公开的 `wait_stop()`。logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
 
 `import jt.log.format;` 提供向 `jt::base::buffer_1k` 追加的 `jt::log::format_to(buffer, fmt, args...)` 和 `jt::log::vformat_to(buffer, fmt, format_args)`，也由 `jt.log` 和 `jt` 再导出。前者保留编译期格式串检查，后者接受运行时格式串；二者同步格式化并向调用者传播异常，日志和控制台辅助函数继续捕获异常。运行时格式化引擎及本地时间格式化集中在单个实现单元，避免已复现的 GCC 16.2 / MinGW `import std` 重复定义，不依赖 `--allow-multiple-definition`。用户自己的标准库格式化调用及自定义 `std::formatter` 内部实现仍受工具链限制。
 

@@ -1,5 +1,7 @@
 # 日志基准
 
+先按 [README 的构建说明](../README.md#构建) 配置 `VCPKG_ROOT` 和 GCC 16；以下预设使用仓库的 `jt-gcc16` triplet。
+
 ```sh
 cmake --preset release
 cmake --build --preset release --target jt_log_benchmark
