@@ -1,0 +1,89 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 4,
+    "minor": 3,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
+        "VCPKG_TARGET_TRIPLET": "jt-gcc16",
+        "BUILD_TESTING": "ON",
+        "JT_BUILD_EXAMPLES": "ON",
+        "JT_BUILD_BENCHMARKS": "OFF"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "GCC 16 Ninja Debug",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "GCC 16 Ninja Release with benchmarks",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "JT_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "release-with-debug",
+      "displayName": "GCC 16 Ninja Release with debug info and benchmarks",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/release-with-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "JT_BUILD_BENCHMARKS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "release-with-debug",
+      "configurePreset": "release-with-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release-with-debug",
+      "configurePreset": "release-with-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

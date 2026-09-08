@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "jt",
+  "description": "使用 C++23 modules 的服务器框架基础库",
+  "dependencies": [
+    "lz4",
+    "mimalloc",
+    "rapidjson"
+  ]
+}
