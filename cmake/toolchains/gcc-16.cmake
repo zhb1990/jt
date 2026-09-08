@@ -18,6 +18,28 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     # GCC invokes tools and runtime DLLs from the UCRT64 bin directory. GUI
     # processes do not necessarily inherit the MSYS2 shell's PATH.
     set(ENV{PATH} "${jt_gcc_root};$ENV{PATH}")
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+    find_program(jt_brew_program NAMES brew
+        PATHS /opt/homebrew/bin /usr/local/bin
+        REQUIRED)
+    execute_process(
+        COMMAND "${jt_brew_program}" --prefix gcc
+        RESULT_VARIABLE jt_brew_gcc_result
+        OUTPUT_VARIABLE jt_brew_gcc_prefix
+        ERROR_VARIABLE jt_brew_gcc_error
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT jt_brew_gcc_result EQUAL 0)
+        message(FATAL_ERROR
+            "Failed to query the Homebrew GCC prefix: ${jt_brew_gcc_error}")
+    endif()
+
+    set(jt_c_compiler "${jt_brew_gcc_prefix}/bin/gcc-16")
+    set(jt_cxx_compiler "${jt_brew_gcc_prefix}/bin/g++-16")
+    if(NOT EXISTS "${jt_c_compiler}" OR NOT EXISTS "${jt_cxx_compiler}")
+        message(FATAL_ERROR
+            "Homebrew GCC 16 was not found under ${jt_brew_gcc_prefix}; "
+            "install the gcc formula that provides gcc-16 and g++-16")
+    endif()
 else()
     find_program(jt_c_compiler NAMES gcc-16 REQUIRED)
     find_program(jt_cxx_compiler NAMES g++-16 REQUIRED)

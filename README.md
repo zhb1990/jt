@@ -20,7 +20,7 @@
 
 仓库预设默认使用 vcpkg manifest（`vcpkg.json`）安装依赖，并通过 `jt-gcc16` triplet 为项目和依赖选择 GCC 16。先设置 `VCPKG_ROOT` 指向已安装的 vcpkg 根目录：POSIX shell 使用 `export VCPKG_ROOT=/path/to/vcpkg`，PowerShell 使用 `$env:VCPKG_ROOT = 'C:/path/to/vcpkg'`。
 
-Windows 使用 MSYS2 UCRT64 的 `gcc.exe`/`g++.exe`，默认目录为 `C:/msys64`，可通过 `MSYS2_ROOT` 修改；macOS/Linux 从 PATH 查找 `gcc-16`/`g++-16`。预设的链式工具链会设置编译器，仅设置 `CXX` 不会覆盖它。
+Windows 使用 MSYS2 UCRT64 的 `gcc.exe`/`g++.exe`，默认目录为 `C:/msys64`，可通过 `MSYS2_ROOT` 修改；macOS 通过 `brew --prefix gcc` 定位 Homebrew 的 `gcc-16`/`g++-16`，不会使用 Apple 自带编译器；Linux 从 PATH 查找 `gcc-16`/`g++-16`。预设的链式工具链会设置编译器，仅设置 `CXX` 不会覆盖它。
 
 ```sh
 cmake --preset debug
