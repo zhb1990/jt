@@ -9,6 +9,11 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     set(VCPKG_ENV_PASSTHROUGH MSYS2_ROOT)
     set(VCPKG_ENV_PASSTHROUGH_UNTRACKED PATH)
     set(VCPKG_POLICY_DLLS_WITHOUT_LIBS enabled)
+    # JT calls mi_malloc directly. Shared mimalloc still links mimalloc-redirect,
+    # which must initialize before ucrtbase; a dependent libjt.dll cannot.
+    if(PORT STREQUAL "mimalloc")
+        set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DMI_WIN_REDIRECT=OFF)
+    endif()
 elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
     if(jt_host_processor MATCHES "^(arm64|aarch64)$")
         set(VCPKG_TARGET_ARCHITECTURE arm64)

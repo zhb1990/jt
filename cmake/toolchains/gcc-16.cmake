@@ -18,6 +18,12 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     # GCC invokes tools and runtime DLLs from the UCRT64 bin directory. GUI
     # processes do not necessarily inherit the MSYS2 shell's PATH.
     set(ENV{PATH} "${jt_gcc_root};$ENV{PATH}")
+    # mimalloc selects the UCRT64 Windows init path from MSYSTEM. vcpkg
+    # configures packages outside msys2.exe; without this it registers both
+    # TLS callbacks and a GCC constructor and double-inits.
+    if(NOT DEFINED ENV{MSYSTEM})
+        set(ENV{MSYSTEM} "UCRT64")
+    endif()
 elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
     find_program(jt_brew_program NAMES brew
         PATHS /opt/homebrew/bin /usr/local/bin
