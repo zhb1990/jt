@@ -33,3 +33,6 @@ endif()
 if(JT_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
+
+include(cmake/JTClangdCompileCommands.cmake)
+jt_configure_clangd_compile_commands()

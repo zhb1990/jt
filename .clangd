@@ -1,0 +1,18 @@
+# Out-of-source debug database. clangd only walks parent directories of
+# the source file, so it will not find build/debug/compile_commands.json
+# without this. Still requires clangd 17+ invoked with:
+#   --compile-commands-dir=build/debug
+#   --query-driver=<g++ glob>
+#   --experimental-modules-support
+# --compile-commands-dir is also needed so import std can compile GCC's
+# std.cc, which lives outside the project and does not load this file.
+CompileFlags:
+  CompilationDatabase: build/debug
+  Remove:
+    - -fmodules-ts
+    - -fmodule-mapper=*
+    - -fdeps-format=*
+    - -fmodule-only
+    - -MD
+Completion:
+  HeaderInsertion: Never
