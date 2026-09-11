@@ -15,6 +15,7 @@
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/gcc-16.cmake",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
         "VCPKG_TARGET_TRIPLET": "jt-gcc16",
+        "VCPKG_HOST_TRIPLET": "jt-gcc16",
         "BUILD_TESTING": "ON",
         "JT_BUILD_EXAMPLES": "ON",
         "JT_BUILD_BENCHMARKS": "OFF"

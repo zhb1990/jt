@@ -18,7 +18,9 @@
 
 参考：[CMake C++ modules 文档](https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html)。实验性 `import std` gate 随 CMake 版本变化；当前默认 gate 在本机 CMake 4.4.3 验证通过，其他版本可通过同名 CMake cache 参数覆盖。
 
-仓库预设默认使用 vcpkg manifest（`vcpkg.json`）安装依赖，并通过 `jt-gcc16` triplet 为项目和依赖选择 GCC 16。先设置 `VCPKG_ROOT` 指向已安装的 vcpkg 根目录：POSIX shell 使用 `export VCPKG_ROOT=/path/to/vcpkg`，PowerShell 使用 `$env:VCPKG_ROOT = 'C:/path/to/vcpkg'`。
+仓库预设默认使用 vcpkg manifest（`vcpkg.json`）安装依赖，并通过 `jt-gcc16` 同时作为 target 与 host triplet，为项目、依赖和 vcpkg host 工具选择 GCC 16。Windows 上因此不需要 Visual Studio / MSVC。先设置 `VCPKG_ROOT` 指向已安装的 vcpkg 根目录：POSIX shell 使用 `export VCPKG_ROOT=/path/to/vcpkg`，PowerShell 使用 `$env:VCPKG_ROOT = 'C:/path/to/vcpkg'`。
+
+Cursor、VS Code CMake Tools 等 GUI 进程可能缺少 `ProgramFiles(x86)`。若仍使用 vcpkg 默认 host triplet `x64-windows`，会在配置阶段报 `Unable to find a valid Visual Studio instance`；请选用仓库的 `debug` / `release` 预设，不要改用 `x64-windows`。
 
 Windows 使用 MSYS2 UCRT64 的 `gcc.exe`/`g++.exe`，默认目录为 `C:/msys64`，可通过 `MSYS2_ROOT` 修改；macOS 通过 `brew --prefix gcc` 定位 Homebrew 的 `gcc-16`/`g++-16`，不会使用 Apple 自带编译器；Linux 从 PATH 查找 `gcc-16`/`g++-16`。预设的链式工具链会设置编译器，仅设置 `CXX` 不会覆盖它。
 

@@ -59,7 +59,7 @@ static_assert(jt::base::writable_buffer<decltype(buffer)>);
 
 CMake 消费目标推荐链接 `jt::jt`，原目标 `libjt` 保留。删除旧构建缓存/BMI 或使用新的构建目录，然后完整重建。示例源文件从 src 移至 examples，main 目标仍存在，输出位于 `<build>/examples/main`。
 
-`debug`、`release`、`release-with-debug` 预设默认使用 `VCPKG_ROOT` 下的 vcpkg toolchain、仓库 `jt-gcc16` triplet 和 manifest 依赖。旧的仅设置 `CXX` 或 `CMAKE_PREFIX_PATH` 的预设用法不再足够；环境设置及自选工具链构建方式见 [README](../README.md#构建)。
+`debug`、`release`、`release-with-debug` 预设默认使用 `VCPKG_ROOT` 下的 vcpkg toolchain、仓库 `jt-gcc16` 作为 target 与 host triplet，以及 manifest 依赖。Windows 上 host 工具不再走默认的 `x64-windows`（MSVC）。旧的仅设置 `CXX` 或 `CMAKE_PREFIX_PATH` 的预设用法不再足够；环境设置及自选工具链构建方式见 [README](../README.md#构建)。
 
 本轮未实现 async、net、actor；未来模块约定见 [architecture.md](architecture.md)。当前移除 Asio 强制依赖，mimalloc/LZ4/RapidJSON 仍需安装。
 
