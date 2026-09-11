@@ -1,7 +1,3 @@
-module;
-
-#include "../detail/platform/config.h"
-
 module jt.base.buffer;
 
 namespace jt::base {
