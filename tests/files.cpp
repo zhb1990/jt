@@ -6,6 +6,11 @@ import jt;
 namespace mem = jt::base;
 namespace fs = std::filesystem;
 
+#ifdef JT_TEST_FILE_LIMITS
+bool limit_file_size(unsigned long long bytes);
+void restore_file_size_limit() noexcept;
+#endif
+
 void check(bool condition, std::string_view message) {
   if (!condition) throw std::runtime_error(std::string(message));
 }
@@ -340,8 +345,107 @@ void publish_failure_preserves_source() {
         "failed archive publication preserves source");
 }
 
+void retention_limit() {
+  temporary_directory temp;
+  jt::log::service service;
+  for (const auto days :
+       {0u, 1095u, 1096u, std::numeric_limits<std::uint32_t>::max()}) {
+    const auto path = temp.path / std::to_string(days);
+    const auto directory = path.string();
+    const auto archive = (path / "archive").string();
+    bool rejected = false;
+    try {
+      jt::log::sink_file sink(service, {.name = "limit",
+                                        .directory = directory,
+                                        .lz4_directory = archive,
+                                        .keep_days = days});
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    check(rejected == (days > 1095), "retention construction boundary");
+    if (rejected) check(!fs::exists(path), "reject before filesystem changes");
+  }
+  const auto fresh = temp.path / "limit_20260912.log.lz4";
+  std::ofstream(fresh) << "preserve";
+  bool rejected = false;
+  try {
+    service.make_lz4_client().clear("limit", temp.path.string(),
+                                    std::numeric_limits<std::uint32_t>::max());
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  check(rejected && read(fresh) == "preserve",
+        "direct cleanup rejects overflow");
+}
+
+void file_error_recovery() {
+#ifdef JT_TEST_FILE_LIMITS
+  struct payload_formatter : jt::log::formatter {
+    void format(const jt::log::log_record_view& record, mem::buffer_1k& output,
+                std::size_t& start, std::size_t& stop) override {
+      output.append(record.payload);
+      start = stop = 0;
+    }
+  };
+  for (const auto size : {5u, 8192u}) {
+    temporary_directory temp;
+    const auto directory = temp.path.string();
+    const auto archive = (temp.path / "archive").string();
+    const auto point = std::chrono::system_clock::now();
+    {
+      jt::log::service service;
+      jt::log::sink_file sink(service, {.name = "recover",
+                                        .directory = directory,
+                                        .lz4_directory = archive,
+                                        .max_size = 64});
+      sink.set_formatter(
+          mem::make_dynamic_unique<jt::log::formatter, payload_formatter>());
+      write_record(sink, "seed\n", point);
+      fs::path source;
+      for (const auto& entry : fs::directory_iterator(temp.path)) {
+        if (entry.path().extension() == ".log") source = entry.path();
+      }
+      check(!source.empty(), "recovery source exists");
+      bool failed = false;
+      {
+        struct restore_limit {
+          ~restore_limit() { restore_file_size_limit(); }
+        } restore;
+        check(limit_file_size(fs::file_size(source) + 1), "set file limit");
+        try {
+          write_record(sink, std::string(size, 'x'), point);
+        } catch (const std::ios_base::failure&) {
+          failed = true;
+        }
+      }
+      check(failed, "write or flush failure reaches direct sink caller");
+      write_record(sink, "recovered\n", point);
+      const auto contents = read(source);
+      check(contents.find("recovered\n") != std::string::npos &&
+                contents.find("recovered\n") == contents.rfind("recovered\n"),
+            "later record written once after I/O recovery");
+      check(read(temp.path / "manifest_recover.json").find("\"seq\":0") !=
+                std::string::npos,
+            "failed bytes do not trigger premature rotation");
+      write_record(sink, std::string(70, 'r'), point);
+      write_record(sink, "after rotation\n", point);
+    }
+    std::size_t archives = 0;
+    for (const auto& entry : fs::directory_iterator(archive)) {
+      if (entry.path().extension() != ".lz4") continue;
+      ++archives;
+      check(decompress(entry.path()).find("recovered\n") != std::string::npos,
+            "rotation archives successfully recovered contents");
+    }
+    check(archives == 1, "rotation continues after recovery");
+  }
+#endif
+}
+
 int main() {
   try {
+    retention_limit();
+    file_error_recovery();
     shutdown_flush_retained_logger();
     rotation_and_manifest();
     daily_rotation();

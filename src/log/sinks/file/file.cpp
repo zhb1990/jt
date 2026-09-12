@@ -31,6 +31,9 @@ class sink_file_imp {
         max_size_(config.max_size),
         daily_rotation_(config.daily_rotation),
         keep_days_(config.keep_days) {
+    if (keep_days_ > 3 * 365) {
+      throw std::invalid_argument("keep_days must not exceed 1095 days");
+    }
     // 保存配置信息
     name_ = config.name;
     directory_ = config.directory;
@@ -64,17 +67,21 @@ class sink_file_imp {
    * @param buf 日志缓冲区
    */
   void write(const sink::time_point& point, const base::buffer_1k& buf) {
+    // Reopen after an I/O failure and recover the size before rotation checks.
+    if (!file_.is_open() && manifest_.day != 0) {
+      file_open();
+    }
     auto zone = std::chrono::current_zone();
     auto local_point = zone->to_local(point);
 
     // 检查是否需要进行日志轮换（基于时间或文件大小）
     if (local_point >= tomorrow_) {
       const auto old_day = manifest_.day;
-      tomorrow_ = std::chrono::floor<std::chrono::days>(local_point) +
-                  std::chrono::days(1);
+      const auto today = std::chrono::floor<std::chrono::days>(local_point);
       if (daily_rotation_ || manifest_.day == 0) {
-        rotate();  // 执行日志轮换
+        rotate(today);  // 执行日志轮换
       }
+      tomorrow_ = today + std::chrono::days(1);
 
       // 清理过期的压缩日志文件
       if (keep_days_ > 0 && old_day > 0) {
@@ -82,22 +89,23 @@ class sink_file_imp {
       }
     }
 
-    // 检查文件大小是否超过限制
-    if (file_size_ >= max_size_) {
-      rotate();  // 执行日志轮换
-    }
-
     // 确保文件已打开
     if (!file_.is_open()) {
       file_open();
-      if (!file_.is_open()) {
-        return;
-      }
+    }
+
+    // Include the actual size of a reopened file in the rotation decision.
+    if (file_size_ >= max_size_) {
+      rotate(tomorrow_ - std::chrono::days(1));
+      file_open();
     }
 
     // 写入日志数据并更新文件大小计数
     file_.write(reinterpret_cast<const char*>(buf.begin_read()),
                 static_cast<std::streamsize>(buf.readable()));
+    if (!file_) {
+      file_failed("log file write failed");
+    }
     file_size_ += buf.readable();
   }
 
@@ -108,10 +116,22 @@ class sink_file_imp {
   void flush_unlock() {  // NOLINT(*-convert-member-functions-to-static)
     if (file_.is_open()) {
       file_.flush();
+      if (!file_) {
+        file_failed("log file flush failed");
+      }
     }
   }
 
  private:
+  [[noreturn]] void file_failed(const char* message) {
+    // Close while the error is still present; the next write reopens the file
+    // and reads its actual size. Never archive a file whose close failed.
+    if (file_.is_open()) file_.close();
+    file_.clear();
+    file_size_ = 0;
+    throw std::ios_base::failure(message);
+  }
+
   /**
    * 加载清单文件（manifest）
    * 读取之前保存的日志轮换状态（日期和序号）
@@ -177,17 +197,20 @@ class sink_file_imp {
    * 执行日志轮换操作
    * 关闭当前日志文件，触发LZ4压缩，并创建新的日志文件
    */
-  void rotate() {
+  void rotate(std::chrono::local_days date) {
     // 关闭当前文件并重置大小计数
     if (file_.is_open()) {
       file_.close();
+      if (!file_) {
+        file_failed("log file close failed");
+      }
       file_size_ = 0;
       // 触发当前日志文件的LZ4压缩
       lz4_.post(file_name_, lz4_directory_);
     }
 
     // 计算今天的日期（用于命名新日志文件）
-    const std::chrono::year_month_day today{tomorrow_ - std::chrono::days{1}};
+    const std::chrono::year_month_day today{date};
     const std::int32_t day = int{today.year()} * 10000 +
                              unsigned{today.month()} * 100 +
                              unsigned{today.day()};
@@ -227,11 +250,15 @@ class sink_file_imp {
     file_name_ /= u8strv;
 
     // 如果文件已存在，获取其大小用于续写
+    file_size_ = 0;
     if (std::filesystem::exists(file_name_)) {
       file_size_ = std::filesystem::file_size(file_name_);
     }
     // 以追加模式打开文件
     file_.open(file_name_, std::ios::binary | std::ios::app);
+    if (!file_) {
+      file_failed("log file open failed");
+    }
   }
 
   service::lz4_client lz4_;

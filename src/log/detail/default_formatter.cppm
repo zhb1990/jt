@@ -24,7 +24,8 @@ class default_formatter final : public formatter {
  private:
   base::base_memory_buffer<128> date_and_time_{};
   base::base_memory_buffer<32> zone_offset_{};
-  std::time_t last_second_{0};
+  std::chrono::sys_seconds last_second_{};
+  bool time_cache_valid_{false};
 };
 
 }  // namespace jt::log

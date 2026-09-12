@@ -149,3 +149,16 @@ macOS arm64 / GCC 16.2、libstdc++、mimalloc 3.3.2 的 Debug 预设配置与构
 修改的 C++ 区域通过 clang-format 检查，`git diff --check` 通过。本次未运行 ASAN/TSAN、Release 或 Windows/Linux 验证；持续内存耗尽未做故障注入。
 
 时间缓存撤回后，恢复原有按秒比较及更新逻辑，移除缓存有效标志和对应 epoch 回归用例。重新运行 Debug 配置、构建及 CTest，23/23 测试通过，`git diff --check` 通过；其余修复保留。
+
+## 保留期限、I/O 恢复与关闭修复（2026-09-12）
+
+macOS arm64 / GCC 16.2 的 Debug 预设配置、构建成功，当前 23/23 CTest 通过。新增回归覆盖：
+
+- `keep_days` 为 0、1095、1096 和 `UINT32_MAX`；超限构造在创建目录前抛出 `std::invalid_argument`，直接归档清理同样拒绝溢出值。
+- POSIX `RLIMIT_FSIZE` 制造短记录刷新失败和 8192 字节记录写入失败，恢复限制后验证后续记录只写入一次、失败字节不触发提前轮转，并验证恢复后归档内容。系统头文件和限制操作隔离在 `tests/file_limits.cpp`，测试恢复原限制和信号处理；该故障测试仅在 UNIX 构建运行。
+- `make_unique<const int>` 和 256 字节对齐 const 对象的值、析构次数与内存平衡。
+- 首次 epoch、负整数秒、负半秒、epoch 前一微秒、同秒及反复跨 epoch 的日期缓存和非负毫秒输出。
+
+归档内存耗尽诊断位于忽略的 `build/review-fixes-diagnostic`：复用当前构建对象，仅替换普通内存桥接单元，重新链接隔离动态库；诊断开关不进入正式库。用 FIFO 暂停第一个归档的读取，排入另外 20 个请求后持续拒绝所有新的 JT 分配，再解除读取阻塞。探针确认分配失败开关有效，21 个归档排空、解压内容一致、源文件移除，且排空及另一次空队列关闭均未申请新 JT 内存。结果见该目录的 `result.log`。
+
+本轮保留调用方自行完成的内存统计初始化修复，未修改 `src/base/memory.cpp`。未运行 Release、ASAN/TSAN 或 Windows/Linux 验证。I/O 恢复针对后续记录，不自动重放可能已经部分写入的失败记录。

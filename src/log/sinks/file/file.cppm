@@ -32,7 +32,8 @@ struct sink_file_config {  // NOLINT(*-pro-type-member-init)
   std::size_t max_size{200 * 1024 * 1024};
   // 是否每日轮换日志文件
   bool daily_rotation{true};
-  // 保留文件的时间 单位天
+  // 保留文件的时间，单位天；0 禁用清理，最多三年（1095 天）。
+  // 超过上限时 sink_file 构造抛出 std::invalid_argument。
   std::uint32_t keep_days{30};
 };
 

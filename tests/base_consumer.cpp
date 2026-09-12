@@ -96,6 +96,15 @@ void check_buffer_copy() {
 }
 
 int main() {
+  const auto before_const = jt::base::allocated_memory();
+  const auto destroyed_const = aligned_object<256>::destroyed;
+  {
+    auto number = jt::base::make_unique<const int>(42);
+    auto object = jt::base::make_unique<const aligned_object<256>>();
+    check(*number == 42 && object->value == 17);
+  }
+  check(jt::base::allocated_memory() == before_const &&
+        aligned_object<256>::destroyed == destroyed_const + 1);
   check_buffer_copy<jt::base::buffer_1k, jt::base::buffer_2k>();
   check_buffer_copy<jt::base::buffer_2k, jt::base::buffer_1k>();
   check_alignment<64>();

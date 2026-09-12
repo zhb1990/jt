@@ -177,7 +177,7 @@ struct deleter {
   void operator()(T* ptr) const noexcept {
     static_assert(sizeof(*ptr), "can't delete an incomplete type");
     ptr->~T();
-    return deallocate(ptr);
+    return deallocate(const_cast<std::remove_cv_t<T>*>(ptr));
   }
 };
 

@@ -33,7 +33,7 @@
 
 logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非导出前向声明与使用它的接口保持同一模块归属。`formatter`、`sink` 和派生 sink 保留独立命名模块，避免回退到项目曾遇到的 GCC Darwin 重复 typeinfo 结构。
 
-公开日志与控制台模板依赖 PUBLIC 模块 `jt.log.format`，只构造 `std::format_args`，通过非模板函数调用 `src/log/format.cpp` 中的运行时引擎。该实现单元同时负责 chrono 格式化，因为 chrono formatter 内部也会调用标准库格式化引擎。`format_local_time(timestamp, date_and_time, zone_offset)` 覆盖 128/32 字节内联缓存，按当前时区输出秒精度日期时间及 UTC 偏移。默认 formatter 的非模板成员定义位于相邻的 `detail/default_formatter.cpp`，保留原有缓存和输出行为。
+公开日志与控制台模板依赖 PUBLIC 模块 `jt.log.format`，只构造 `std::format_args`，通过非模板函数调用 `src/log/format.cpp` 中的运行时引擎。该实现单元同时负责 chrono 格式化，因为 chrono formatter 内部也会调用标准库格式化引擎。`format_local_time(timestamp, date_and_time, zone_offset)` 覆盖 128/32 字节内联缓存，按当前时区输出秒精度日期时间及 UTC 偏移。默认 formatter 的非模板成员定义位于相邻的 `detail/default_formatter.cpp`，以 `sys_seconds` 的向下取整结果作为缓存键，使用有效标志覆盖首次 epoch，并仅在格式化成功后提交缓存。毫秒部分采用同一向下取整规则，支持负时间戳。
 
 格式化参数仅在当前调用期间借用，不进入异步队列；队列仍保存格式化后的字节。这个边界集中 JT 的标准库实例化，不能修复用户在多个翻译单元直接调用 `std::format`、chrono formatter 或在自定义 formatter 内再次使用标准库格式化引擎时的工具链问题。
 
@@ -49,7 +49,7 @@ logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非�
 
 内部声明使用 `jt.log.core:message/:service_impl/:writer/:archive` 非导出分区，定义使用 `module jt.log.core;`。LZ4 头文件只存在于归档内部单元；RapidJSON 只用于文件 sink 实现。
 
-归档循环的异常保护覆盖临时队列构造、提取、处理及停止判断；构造失败时报告并重试，尚未提取的请求保留在共享队列。逐消息异常继续隔离，不阻断同批后续请求。
+归档循环在互斥锁内等待请求或停止通知，逐条移动队首消息并弹出，再在锁外处理。消息默认构造、移动及队首弹出不分配内存，因此待处理队列耗尽可用内存时，仍能取出请求和检查停止条件。处理阶段的异常逐条隔离，失败请求的源文件保留；停止时排空已接收请求后退出。
 
 启动时先构造 worker 状态和压缩上下文，再启动 writer，最后启动 archive。archive 线程创建失败时停止并回收 writer；worker 析构提供额外清理保证。
 
@@ -98,3 +98,11 @@ flowchart TD
 PUBLIC/PRIVATE 是 CMake 文件集可见性，不能仅凭 `export module` 判断是否为用户 API。模板所需依赖必须可被消费者取得；内部平台实现通过实现单元使用，不得从公共接口导入。
 
 Windows 的库及消费目标使用容量为 1 的 Ninja 链接任务池，使链接附带的 vcpkg applocal 和 JT DLL 复制步骤不会在共享输出目录中并发写同一个文件；源码编译仍可并行。JT 合并并去重消费者与 libjt 的运行库列表，使用 `copy_if_different` 复制，避免重复写入 mimalloc 等共同依赖。
+
+## 文件错误与保留期限
+
+文件 sink 构造在文件系统操作之前验证 `keep_days <= 1095`，0 禁用清理，三年按每年 365 天计；直接归档清理入口也拒绝超限请求，避免时钟精度转换溢出。非法值抛出 `std::invalid_argument`。
+
+文件流每次打开、写入、刷新和轮转关闭后检查状态。失败时关闭并清除流错误、丢弃推算大小，向直接调用方抛出 `std::ios_base::failure`；下一条记录重新打开目标并从文件系统恢复大小，再判断轮转。关闭失败不提交归档，日期边界只在轮转成功后推进。logger 维持逐 sink 异常隔离。失败记录不重放，可能留有部分内容；不承诺磁盘故障期间的完整性或 fsync 持久化。
+
+普通 `unique_ptr` 删除器在析构对象后去除指针的 cv 限定再释放原始存储，使 `make_unique<const T>` 可用；分配对齐和多态删除器规则不变。

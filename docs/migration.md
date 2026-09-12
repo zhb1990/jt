@@ -82,4 +82,12 @@ GCC 16.2 / MinGW 的 `import std` 重复定义通过集中格式化实现及移�
 
 `create_logger` 保留 `input_range` 接口并支持独立 sentinel，范围元素仍按顺序移动。`make_sure_writable` 对不可表示的容量抛出 `std::length_error`；分配失败仍为 `std::bad_alloc`，失败后内容、容量及读写位置不变。`read_buffer` 的超长跳过饱和到末尾。
 
-每日轮转将恰好午夜的记录写入新日期文件。归档循环也捕获临时队列构造异常。以上无需修改调用方式，但模板变化要求重建库、BMI 及消费者。
+每日轮转将恰好午夜的记录写入新日期文件。归档循环逐条取出请求，不再依赖临时队列分配完成排空或停止。以上无需修改调用方式，但模板变化要求重建库、BMI 及消费者。
+
+## 审核修复
+
+`sink_file_config::keep_days` 新增 1095 天上限（三年按 365 天/年计算），超限构造抛出 `std::invalid_argument`；0 仍禁用清理。直接使用存活的 `lz4_client::clear` 也需遵守上限。
+
+直接调用文件 sink 的 `consume` / `flush` 现在会收到文件打开、写入、刷新和轮转关闭失败的 `std::ios_base::failure`。通过 logger 调用仍隔离异常。后续记录会重新打开出错文件、恢复实际大小并继续轮转；失败记录不自动重放，可能部分写入。
+
+`make_unique<const T>` 可以正常构造、析构及释放。默认格式化器修复首次 epoch、负时间戳的毫秒部分及跨 epoch 缓存；内部缓存布局变化需要重建库和 BMI。

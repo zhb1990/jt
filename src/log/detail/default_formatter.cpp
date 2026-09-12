@@ -19,8 +19,9 @@ ToDuration time_fraction(const std::chrono::system_clock::time_point& tp) {
   using std::chrono::duration_cast;
   using std::chrono::seconds;
   const auto duration = tp.time_since_epoch();
-  const auto secs = duration_cast<seconds>(duration);
-  return duration_cast<ToDuration>(duration) - duration_cast<ToDuration>(secs);
+  const auto secs = std::chrono::floor<seconds>(duration);
+  return std::chrono::floor<ToDuration>(duration) -
+         duration_cast<ToDuration>(secs);
 }
 
 void default_formatter::format(const log_record_view& record,
@@ -28,10 +29,12 @@ void default_formatter::format(const log_record_view& record,
                                std::size_t& color_start,
                                std::size_t& color_stop) {
   using namespace std::chrono;
-  if (const auto current_second = system_clock::to_time_t(record.timestamp);
-      current_second != last_second_) {
-    last_second_ = current_second;
+  if (const auto current_second = floor<seconds>(record.timestamp);
+      !time_cache_valid_ || current_second != last_second_) {
+    time_cache_valid_ = false;
     format_local_time(record.timestamp, date_and_time_, zone_offset_);
+    last_second_ = current_second;
+    time_cache_valid_ = true;
   }
 
   const auto millis = time_fraction<milliseconds>(record.timestamp);

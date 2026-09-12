@@ -226,6 +226,9 @@ void archive_worker::post_lz4(const std::filesystem::path& file_name,  // NOLINT
 void archive_worker::clear_lz4(const base::string& name,
                                const std::string_view lz4_directory,
                                const std::uint32_t keep_days) {
+  if (keep_days > 3 * 365) {
+    throw std::invalid_argument("keep_days must not exceed 1095 days");
+  }
   lz4_message msg;
   msg.tp = lz4_message::type::clear;
   msg.lz4_directory = lz4_directory;
@@ -349,33 +352,24 @@ void archive_worker::clear_lz4_files(const lz4_message& msg) {  // NOLINT
 void archive_worker::lz4_run() {  // NOLINT(*-make-member-function-const)
   while (true) {
     try {
-      base::deque<lz4_message> queue;
-      bool stop_requested = false;
+      lz4_message msg;
       {
         std::unique_lock lock{lz4_mutex_};
-        lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
+        lz4_cv_.wait(lock, [this] {
           return !lz4_queue_.empty() || lz4_stop_requested_;
         });
-        queue = std::move(lz4_queue_);
-        stop_requested = lz4_stop_requested_;
+        if (lz4_queue_.empty()) break;  // Stop requested with nothing to drain.
+        // Moving a message and popping the front require no allocation, even
+        // when the pending queue has exhausted the available memory.
+        msg = std::move(lz4_queue_.front());
+        lz4_queue_.pop_front();
       }
 
-      for (auto& msg : queue) {
-        try {
-          if (msg.tp == lz4_message::type::lz4) {
-            lz4_data_.compress(msg.file_name, msg.lz4_directory);
-          } else if (msg.tp == lz4_message::type::clear) {
-            clear_lz4_files(msg);
-          }
-        } catch (const std::exception& e) {
-          print_stderr("lz4 worker exception: {}\n", e.what());
-          // 异常可能发生在 compressBegin 之后：这里再 reset_ctx()
-        } catch (...) {
-          print_stderr("lz4 worker unknown exception\n");
-        }
+      if (msg.tp == lz4_message::type::lz4) {
+        lz4_data_.compress(msg.file_name, msg.lz4_directory);
+      } else if (msg.tp == lz4_message::type::clear) {
+        clear_lz4_files(msg);
       }
-
-      if (stop_requested) break;
     } catch (const std::exception& e) {
       print_stderr("lz4 worker exception: {}\n", e.what());
     } catch (...) {

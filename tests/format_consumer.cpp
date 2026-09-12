@@ -87,6 +87,22 @@ int main() {
   check(std::string_view(zone) == std::string_view(output),
         "local zone offset");
 
+  captured epoch_values;
+  capture_sink epoch_sink(epoch_values);
+  for (const auto elapsed :
+       {0, -500000, 0, -1000000, -1500000, -1, 0, 500000, 1000000, 0}) {
+    const auto point = std::chrono::system_clock::time_point{} +
+                       std::chrono::microseconds(elapsed);
+    epoch_sink.consume({.timestamp = point, .payload = "epoch"});
+    jt::log::format_local_time(point, date, zone);
+    const auto remainder = ((elapsed % 1000000) + 1000000) % 1000000;
+    output.clear();
+    jt::log::format_to(output, "[{}.{:03} {}]", std::string_view(date),
+                       remainder / 1000, std::string_view(zone));
+    check(epoch_values.lines.back().starts_with(std::string_view(output)),
+          "negative fractions and epoch crossings use the correct second");
+  }
+
   captured values;
   jt::log::service service;
   auto sink =

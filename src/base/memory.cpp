@@ -41,6 +41,8 @@ auto allocate(const std::size_t size, const std::size_t alignment) -> void* {
   if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
     throw std::bad_alloc();
   }
+  
+  auto& metric = memory_total();
   void* ptr = detail::memory_allocate(size, alignment);
   if (!ptr) {
     throw std::bad_alloc();  // 如果分配失败，抛出异常
@@ -48,7 +50,7 @@ auto allocate(const std::size_t size, const std::size_t alignment) -> void* {
 
   // 获取实际分配的大小（可能包括额外的管理开销）
   const auto real = detail::memory_usable_size(ptr);
-  memory_total().fetch_add(real);  // 更新内存统计
+  metric.fetch_add(real);  // 更新内存统计
   return ptr;
 }
 

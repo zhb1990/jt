@@ -96,7 +96,14 @@ int main() {
 
 `import jt.log.format;` 提供向 `jt::base::buffer_1k` 追加的 `jt::log::format_to(buffer, fmt, args...)` 和 `jt::log::vformat_to(buffer, fmt, format_args)`，也由 `jt.log` 和 `jt` 再导出。前者保留编译期格式串检查，后者接受运行时格式串；二者同步格式化并向调用者传播异常，日志和控制台辅助函数继续捕获异常。运行时格式化引擎及本地时间格式化集中在单个实现单元，避免已复现的 GCC 16.2 / MinGW `import std` 重复定义，不依赖 `--allow-multiple-definition`。用户自己的标准库格式化调用及自定义 `std::formatter` 内部实现仍受工具链限制。
 
-`create_logger` 的范围重载支持迭代器与 sentinel 类型不同的输入范围，逐项移动 sink 并保持顺序。缓冲区跳过操作按剩余长度饱和；请求不可表示的可写容量时抛出 `std::length_error`，保留原内容和读写位置。每日文件轮转包含恰好次日零点的边界。归档线程隔离临时队列分配及单条请求的异常。
+`create_logger` 的范围重载支持迭代器与 sentinel 类型不同的输入范围，逐项移动 sink 并保持顺序。缓冲区跳过操作按剩余长度饱和；请求不可表示的可写容量时抛出 `std::length_error`，保留原内容和读写位置。每日文件轮转包含恰好次日零点的边界。归档线程逐条移出请求，排空和停止判断不分配临时队列，单条处理异常不阻断后续请求。
+
+文件 sink 的 `keep_days` 范围为 0–1095 天（三年按 365 天/年计算），0 表示禁用清理；超过上限时构造 `sink_file` 立即抛出 `std::invalid_argument`，不创建文件目录。直接调用存活 service 的 `lz4_client::clear` 也执行该上限检查。
+
+文件打开、写入、刷新或轮转关闭失败会向直接的 sink 调用方抛出 `std::ios_base::failure`；logger 继续隔离这些异常。失败流关闭后，下次记录重新打开文件并读取实际大小，恢复后可继续写入和轮转。失败记录可能部分写入，不自动重放，也不保证失败期间的日志完整性。
+
+`make_unique<const T>` 支持不可变对象及其析构释放。默认日志格式化使用向下取整的秒缓存，支持 epoch 前后的时间和非负的三位毫秒部分。
+
 
 ## 目录
 
