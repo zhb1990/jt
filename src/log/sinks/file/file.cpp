@@ -144,7 +144,7 @@ class sink_file_imp {
 
     // 读取清单文件内容
     const base::string data((std::istreambuf_iterator(manifest)),
-                              std::istreambuf_iterator<char>());
+                            std::istreambuf_iterator<char>());
     rapidjson::Document document;
     document.Parse(data.c_str(), data.size());
     if (document.HasParseError() || !document.IsObject()) {
@@ -184,13 +184,48 @@ class sink_file_imp {
    * 保存清单文件（manifest）
    * 将当前的日志轮换状态（日期和序号）写入磁盘
    */
-  void save_manifest() {
-    std::ofstream file(manifest_path_, std::ios::binary);
+  void save_manifest(std::uint32_t day, std::uint32_t seq) {
     base::buffer_1k temp;
-    jt::log::format_to(temp, R"({{ "day":{}, "seq":{} }})", manifest_.day,
-                       manifest_.seq);
+    jt::log::format_to(temp, R"({{ "day":{}, "seq":{} }})", day, seq);
+    auto temporary = manifest_path_;
+    temporary += ".tmp";
+    std::ofstream file(temporary, std::ios::binary | std::ios::noreplace);
+    if (!file.is_open()) {
+      throw std::ios_base::failure("manifest temporary file open failed");
+    }
+    struct cleanup {
+      std::ofstream& file;
+      const std::filesystem::path& path;
+      bool active{true};
+      ~cleanup() noexcept {
+        if (!active) return;
+        try {
+          if (file.is_open()) file.close();
+        } catch (...) {
+        }
+        try {
+          std::error_code ec;
+          std::filesystem::remove(path, ec);
+        } catch (...) {
+        }
+      }
+    } guard{file, temporary};
     file.write(reinterpret_cast<const char*>(temp.begin_read()),
                static_cast<std::streamsize>(temp.readable()));
+    file.flush();
+    if (!file) {
+      throw std::ios_base::failure("manifest write failed");
+    }
+    file.close();
+    if (!file) {
+      throw std::ios_base::failure("manifest close failed");
+    }
+    std::error_code ec;
+    std::filesystem::rename(temporary, manifest_path_, ec);
+    if (ec) {
+      throw std::ios_base::failure("manifest publication failed", ec);
+    }
+    guard.active = false;
   }
 
   /**
@@ -198,31 +233,34 @@ class sink_file_imp {
    * 关闭当前日志文件，触发LZ4压缩，并创建新的日志文件
    */
   void rotate(std::chrono::local_days date) {
-    // 关闭当前文件并重置大小计数
-    if (file_.is_open()) {
+    const std::chrono::year_month_day today{date};
+    const std::uint32_t day = int{today.year()} * 10000 +
+                              unsigned{today.month()} * 100 +
+                              unsigned{today.day()};
+    auto next = manifest_;
+    if (next.day < day) {
+      next.day = day;
+      next.seq = 0;
+    } else {
+      ++next.seq;
+    }
+
+    const bool archive_previous = file_.is_open();
+    if (archive_previous) {
       file_.close();
       if (!file_) {
         file_failed("log file close failed");
       }
       file_size_ = 0;
-      // 触发当前日志文件的LZ4压缩
-      lz4_.post(file_name_, lz4_directory_);
     }
 
-    // 计算今天的日期（用于命名新日志文件）
-    const std::chrono::year_month_day today{date};
-    const std::int32_t day = int{today.year()} * 10000 +
-                             unsigned{today.month()} * 100 +
-                             unsigned{today.day()};
-
-    // 如果是新的一天，重置序号；否则增加序号
-    if (manifest_.day < day) {  // NOLINT(*-branch-clone)
-      manifest_.day = day;
-      manifest_.seq = 0;
-      save_manifest();
-    } else {
-      ++manifest_.seq;
-      save_manifest();
+    // A failed save leaves the old manifest and source available for retry.
+    // Never let the archive worker remove the source before this commit.
+    save_manifest(next.day, next.seq);
+    manifest_ = next;
+    tomorrow_ = date + std::chrono::days(1);
+    if (archive_previous) {
+      lz4_.post(file_name_, lz4_directory_);
     }
   }
 

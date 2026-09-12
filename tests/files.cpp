@@ -140,6 +140,96 @@ void rotation_and_manifest() {
   check(appended, "manifest restores append target");
 }
 
+void manifest_failure_recovery() {
+  // Exercise exclusive-create failure and atomic-publication failure on every
+  // platform, and a short manifest write through RLIMIT_FSIZE on POSIX.
+  for (const int failure : {0, 1, 2}) {
+#ifndef JT_TEST_FILE_LIMITS
+    if (failure == 2) continue;
+#endif
+    temporary_directory temp;
+    const auto directory = temp.path.string();
+    const auto archive = (temp.path / "archive").string();
+    const auto manifest = temp.path / "manifest_commit.json";
+    const auto temporary = temp.path / "manifest_commit.json.tmp";
+    const auto backup = temp.path / "manifest_backup.json";
+    jt::log::sink_file_config config{.name = "commit",
+                                     .directory = directory,
+                                     .lz4_directory = archive,
+                                     .max_size = 1,
+                                     .keep_days = 0};
+    std::string original;
+    {
+      jt::log::service service;
+      auto sink = mem::make_unique<jt::log::sink_file>(service, config);
+      write_record(*sink, "first-record");
+      original = read(manifest);
+      if (failure == 0) {
+        std::ofstream(temporary) << "existing temporary";
+      } else if (failure == 1) {
+        fs::rename(manifest, backup);
+        fs::create_directory(manifest);
+        std::ofstream(manifest / "occupied") << "preserve directory";
+      }
+      bool threw = false;
+#ifdef JT_TEST_FILE_LIMITS
+      struct restore_limit {
+        ~restore_limit() { restore_file_size_limit(); }
+      } restore;
+      if (failure == 2) check(limit_file_size(1), "limit manifest write");
+#endif
+      try {
+        write_record(*sink, "failed-record");
+      } catch (const std::ios_base::failure&) {
+        threw = true;
+      }
+#ifdef JT_TEST_FILE_LIMITS
+      restore_file_size_limit();
+#endif
+      check(threw, "manifest failure reaches direct sink caller");
+      if (failure == 0) {
+        check(read(temporary) == "existing temporary",
+              "existing manifest temporary is preserved");
+        fs::remove(temporary);
+      } else {
+        check(!fs::exists(temporary), "owned manifest temporary is removed");
+      }
+      if (failure == 1) {
+        check(fs::exists(manifest / "occupied"),
+              "publication target preserved");
+        fs::remove_all(manifest);
+        fs::rename(backup, manifest);
+      }
+      check(read(manifest) == original, "failed save preserves old manifest");
+      write_record(*sink, "recovered-record");
+      check(read(manifest).find("\"seq\":1") != std::string::npos,
+            "retry advances the sequence exactly once");
+      sink.reset();
+      config.max_size = 1024 * 1024;
+      sink = mem::make_unique<jt::log::sink_file>(service, config);
+      write_record(*sink, "after-restart");
+    }
+    std::size_t archives = 0;
+    for (const auto& entry : fs::directory_iterator(archive)) {
+      if (entry.path().extension() != ".lz4") continue;
+      ++archives;
+      check(decompress(entry.path()).find("first-record") != std::string::npos,
+            "old source survives failed commit and is archived on retry");
+    }
+    check(archives == 1, "only the committed rotation is archived");
+    bool appended = false;
+    for (const auto& entry : fs::directory_iterator(temp.path)) {
+      if (entry.path().extension() != ".log") continue;
+      const auto content = read(entry.path());
+      appended |= content.find("recovered-record") != std::string::npos &&
+                  content.find("after-restart") != std::string::npos;
+      check(content.find("failed-record") == std::string::npos,
+            "failed commit does not write a record");
+    }
+    check(appended, "restart restores the successfully committed target");
+  }
+}
+
 void daily_rotation() {
   temporary_directory temp;
   const auto directory = temp.path.string();
@@ -448,6 +538,7 @@ int main() {
     file_error_recovery();
     shutdown_flush_retained_logger();
     rotation_and_manifest();
+    manifest_failure_recovery();
     daily_rotation();
     midnight_rotation();
     retention_and_expiry();

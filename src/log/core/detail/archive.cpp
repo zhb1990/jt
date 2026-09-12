@@ -90,21 +90,34 @@ void lz4_data::compress(const base::string& src,
     return;
   }
 
+  struct temporary_cleanup {
+    std::ofstream& output;
+    const std::filesystem::path& path;
+    bool active{true};
+    ~temporary_cleanup() noexcept {
+      if (!active) return;
+      try {
+        if (output.is_open()) output.close();
+      } catch (...) {
+      }
+      try {
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+      } catch (...) {
+      }
+    }
+  } guard{output, path_dest};
+
   std::uint64_t count_out = 0;
   std::uint64_t count_in = 0;
-  if (!compress_file(output, count_out, count_in, input)) {
-    ctx_invalid = true;
-    output.close();
-    std::error_code ec;
-    std::filesystem::remove(path_dest, ec);
-    return;
-  }
+  // An exception during compression also requires a fresh context on retry.
+  ctx_invalid = true;
+  if (!compress_file(output, count_out, count_in, input)) return;
+  ctx_invalid = false;
 
   // Close and verify output before publishing it (also required on Windows).
   output.close();
   if (!output) {
-    std::error_code ec;
-    std::filesystem::remove(path_dest, ec);
     print_stderr("{}: compress close output fail\n", src);
     return;
   }
@@ -126,6 +139,7 @@ void lz4_data::compress(const base::string& src,
     print_stderr("{}: remove archive temporary file fail, {}\n", src,
                  ec_cleanup.message());
   }
+  guard.active = static_cast<bool>(ec_cleanup);
   if (ec_publish) return;
 
   if (count_in > 0) {

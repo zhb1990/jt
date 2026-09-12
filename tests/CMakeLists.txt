@@ -15,6 +15,15 @@ set_tests_properties(jt.files PROPERTIES TIMEOUT 30)
 jt_configure_executable(jt_tests)
 jt_configure_executable(jt_file_tests)
 
+# POSIX-only replacement-new fault injection stays in a separate executable.
+if(UNIX)
+    add_executable(jt_archive_failure_tests archive_failure.cpp archive_allocation_failure.cpp)
+    target_link_libraries(jt_archive_failure_tests PRIVATE jt::jt lz4::lz4)
+    jt_configure_executable(jt_archive_failure_tests)
+    add_test(NAME jt.archive_failure COMMAND jt_archive_failure_tests)
+    set_tests_properties(jt.archive_failure PROPERTIES TIMEOUT 30)
+endif()
+
 # Compile each public named module in its own consumer translation unit.
 get_target_property(public_modules libjt CXX_MODULE_SET_jt_public_modules)
 foreach(source IN LISTS public_modules)
