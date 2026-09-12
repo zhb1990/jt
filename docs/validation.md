@@ -172,3 +172,11 @@ macOS arm64 / GCC 16 的 Debug 配置、构建成功，24/24 CTest 通过，修�
 新增独立的 POSIX `jt.archive_failure` 测试程序，仅在该程序替换标准分配函数；临时归档已写出后注入一次 `std::bad_alloc`，确认源日志保留、临时文件清理、再次归档成功且解压内容一致。故障注入未进入库实现或公开 API。
 
 本轮未运行 Release、ASAN/TSAN 或 Windows/Linux 实机验证。清单替换不提供 fsync 断电持久化保证；文件系统拒绝删除时临时文件仍可能需要人工清理。
+
+## 独立多态对象所有权类（2026-09-12）
+
+macOS arm64 / GCC 16 的 Debug 配置、构建成功，24/24 CTest 通过。示例在临时目录运行成功，最终 JT 内存统计为 0；修改的 C++ 文件通过 clang-format 检查。
+
+基础消费测试覆盖空值、重复清空、移动构造、覆盖赋值、自移动、交换、容器转移、多重继承的非零基类地址偏移、虚继承、高对齐、const 基类与 const 派生对象、构造异常，以及从旧对象成员中移出所有权。检查各派生对象恰好析构一次和内存统计平衡；编译期检查复制、裸指针接管、裸指针 reset、release 和 get_deleter 不可用，并验证移动、交换、清空和析构的 noexcept 属性。
+
+移除 sink/formatter 的 RTTI 专项断言，原高对齐对象测试改用 static_cast，保留跨库虚函数调用及虚析构检查。源码和测试没有 dynamic_cast/typeid 调用，未增加 RTTI 编译选项。本轮未运行 Release、ASAN/TSAN 或 Windows/Linux 实机验证。

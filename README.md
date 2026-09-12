@@ -60,6 +60,8 @@ ctest --test-dir build/custom --output-on-failure
 
 ## 消费库
 
+`dynamic_unique_ptr<Base>` 是独立的多态对象 RAII 所有权类，直接保存对象指针和原始分配地址，不依赖标准智能指针或 RTTI。使用 `make_dynamic_unique<Base, Derived>(...)` 创建，Base 必须有虚析构函数。使用 `p = std::move(q)` 转移或替换所有权，`p.reset()` 或 `p = nullptr` 清空。`get()` 仅返回借用指针，不提供裸指针接管、`reset(Base*)`、`release()` 或 `get_deleter()`。类型由别名改为类后，需要重新构建库、BMI 和消费者。
+
 
 `allocator<T>`、`make_unique<T>` 和 `make_dynamic_unique<Base, Derived>` 按实际对象类型的对齐要求分配内存，支持高对齐类型。原始内存可使用 `allocate(size, alignment)`，alignment 必须为非零的 2 的幂，释放仍调用 `deallocate`。
 

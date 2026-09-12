@@ -39,6 +39,8 @@ logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非�
 
 队列消息 `message` 是私有实现。公开扩展接口使用 `formatter::format(const log_record_view&, ...)` 和 `sink::consume(const log_record_view&)`；视图中的 `payload` 借用消息内容，若需在调用结束后使用，应自行复制。
 
+`dynamic_unique_ptr<Base>` 在公开内存模块中直接管理基类指针与原始分配地址，不使用标准智能指针或运行时类型查询。工厂按 Derived 的对齐分配，在构造异常时释放；私有接管构造保证两个地址匹配。移动和交换整体转移两个地址，析构及清空先置空自身，再通过虚析构销毁对象并释放原始分配地址。移动赋值先取走来源再销毁旧对象，允许来源是旧对象的所有权成员。移动、清空、交换和析构均为 noexcept，不提供裸指针接管或释放接口。
+
 ## 日志后端
 
 - `service_impl`：logger 注册表、默认 logger 和两个 worker 的生命周期协调。

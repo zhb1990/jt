@@ -211,34 +211,84 @@ auto make_unique(Types&&... args) -> unique_ptr<T> {
 }
 
 /**
- * 动态删除器模板
- * 用于dynamic_unique_ptr的自定义删除策略
- * @tparam Base 基类类型
+ * 独立的多态对象所有权类，不依赖 std::unique_ptr 或 RTTI。
+ * 对象指针和原始分配地址只能整体移动，防止多重继承时错误释放。
+ * 通过 make_dynamic_unique 构造；get() 返回的指针仅供借用。
  */
 template <typename Base>
-struct dynamic_deleter {
+class dynamic_unique_ptr {
   static_assert(std::has_virtual_destructor_v<Base>,
-                "Base must have a virtual destructor for dynamic_deleter");
+                "Base must have a virtual destructor for dynamic_unique_ptr");
 
-  void* raw_ptr{nullptr};
+ public:
+  using element_type = Base;
 
-  /**
-   * 删除对象
-   * @param ptr 要删除的对象指针
-   */
-  void operator()(Base* ptr) const noexcept {
-    ptr->~Base();
-    return deallocate(raw_ptr);
+  constexpr dynamic_unique_ptr() noexcept = default;
+  constexpr dynamic_unique_ptr(std::nullptr_t) noexcept {}
+  dynamic_unique_ptr(const dynamic_unique_ptr&) = delete;
+  auto operator=(const dynamic_unique_ptr&) -> dynamic_unique_ptr& = delete;
+
+  dynamic_unique_ptr(dynamic_unique_ptr&& other) noexcept
+      : ptr_(std::exchange(other.ptr_, nullptr)),
+        allocation_(std::exchange(other.allocation_, nullptr)) {}
+
+  auto operator=(dynamic_unique_ptr&& other) noexcept -> dynamic_unique_ptr& {
+    // Capture ownership before destroying the old object: other can itself be
+    // a member of that object. This also keeps self-move harmless.
+    dynamic_unique_ptr replacement(std::move(other));
+    swap(replacement);
+    return *this;
   }
-};
 
-/**
- * 动态unique_ptr类型别名
- * 用于多态对象的unique_ptr，保存原始指针以便正确释放
- * @tparam Base 基类类型
- */
-template <typename Base>
-using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
+  auto operator=(std::nullptr_t) noexcept -> dynamic_unique_ptr& {
+    reset();
+    return *this;
+  }
+
+  ~dynamic_unique_ptr() noexcept { reset(); }
+
+  [[nodiscard]] auto get() const noexcept -> Base* { return ptr_; }
+  [[nodiscard]] auto operator->() const noexcept -> Base* { return ptr_; }
+  [[nodiscard]] auto operator*() const noexcept -> Base& { return *ptr_; }
+  explicit operator bool() const noexcept { return ptr_ != nullptr; }
+
+  // Clearing is supported; adopting a raw Base* would lose its allocation
+  // address. Replace an object by moving another owner instead.
+  void reset(std::nullptr_t = nullptr) noexcept {
+    auto* ptr = std::exchange(ptr_, nullptr);
+    void* allocation = std::exchange(allocation_, nullptr);
+    if (ptr) {
+      ptr->~Base();
+      deallocate(allocation);
+    }
+  }
+
+  void swap(dynamic_unique_ptr& other) noexcept {
+    std::swap(ptr_, other.ptr_);
+    std::swap(allocation_, other.allocation_);
+  }
+
+  friend void swap(dynamic_unique_ptr& lhs, dynamic_unique_ptr& rhs) noexcept {
+    lhs.swap(rhs);
+  }
+
+  friend bool operator==(const dynamic_unique_ptr& ptr,
+                         std::nullptr_t) noexcept {
+    return ptr.ptr_ == nullptr;
+  }
+
+ private:
+  template <typename B, typename D, typename... Types>
+    requires(std::is_base_of_v<B, D> && std::has_virtual_destructor_v<B> &&
+             std::is_convertible_v<D*, B*>)
+  friend auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<B>;
+
+  dynamic_unique_ptr(Base* ptr, void* allocation) noexcept
+      : ptr_(ptr), allocation_(allocation) {}
+
+  Base* ptr_{nullptr};
+  void* allocation_{nullptr};
+};
 
 /**
  * make_dynamic_unique函数模板
@@ -251,12 +301,13 @@ using dynamic_unique_ptr = std::unique_ptr<Base, dynamic_deleter<Base>>;
  */
 template <typename Base, typename Derived, typename... Types>
   requires(std::is_base_of_v<Base, Derived> &&
-           std::has_virtual_destructor_v<Base>)
+           std::has_virtual_destructor_v<Base> &&
+           std::is_convertible_v<Derived*, Base*>)
 auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
   auto* mem = allocate(sizeof(Derived), alignof(Derived));
   try {
     auto* ptr = ::new (mem) Derived(std::forward<Types>(args)...);
-    return dynamic_unique_ptr<Base>{ptr, {mem}};
+    return dynamic_unique_ptr<Base>{ptr, mem};
   } catch (...) {
     deallocate(mem);
     throw;

@@ -33,8 +33,6 @@ struct capture_sink final : jt::log::sink {
   explicit capture_sink(state& s) : s(s) {
     auto fmt =
         mem::make_dynamic_unique<jt::log::formatter, capture_formatter>(s);
-    check(dynamic_cast<capture_formatter*>(fmt.get()) != nullptr,
-          "formatter RTTI");
     set_formatter(std::move(fmt));
   }
   ~capture_sink() noexcept override { ++s.destroyed; }
@@ -52,7 +50,6 @@ struct capture_sink final : jt::log::sink {
 
 auto make_logger(jt::log::service& service, state& s, bool async) {
   auto sink = mem::make_dynamic_unique<jt::log::sink, capture_sink>(s);
-  check(dynamic_cast<capture_sink*>(sink.get()) != nullptr, "sink RTTI");
   return service.create_logger(std::array{std::move(sink)}, "capture", async);
 }
 

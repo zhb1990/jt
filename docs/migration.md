@@ -32,7 +32,9 @@ jt::base::vector<int> values{1, 2, 3};
 static_assert(jt::base::writable_buffer<decltype(buffer)>);
 ```
 
-`dynamic_deleter<Base>` 和 `make_dynamic_unique<Base, Derived>` 现在要求 Base 有虚析构函数；自定义多态基类需补齐该约束。
+`dynamic_unique_ptr<Base>` 和 `make_dynamic_unique<Base, Derived>` 要求 Base 有虚析构函数；自定义多态基类需满足该约束。旧 `dynamic_deleter` 已移除。
+
+`dynamic_unique_ptr<Base>` 现为独立 RAII 类，工厂名称保持不变。对象替换使用 `p = std::move(q)`；清空使用 `p.reset()`、`p.reset(nullptr)` 或 `p = nullptr`。不再提供 `get_deleter()`、`release()`、`reset(Base*)` 或裸指针接管构造；`get()` 仅用于借用，外部调用方应迁移为整体移动所有权。Derived 指针必须能无歧义地转换为 Base 指针；需要完整重建库、BMI 和消费者。新实现不使用 RTTI，不增加 RTTI 编译选项；测试继续覆盖虚函数调用、跨库虚析构、继承下的地址偏移和释放正确性。
 
 ## 日志 API
 
