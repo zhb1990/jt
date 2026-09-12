@@ -31,10 +31,17 @@ auto memory_total() -> metric_value& {
  * 分配指定大小的内存块
  * 使用mimalloc库进行内存分配，并更新内存统计
  * @param size 要分配的字节数
- * @return 分配的内存指针，如果分配失败返回nullptr
+ * @return 分配的内存指针；失败时抛出 std::bad_alloc
  */
 auto allocate(const std::size_t size) -> void* {
-  void* ptr = detail::memory_allocate(size);  // 使用mimalloc分配内存
+  return allocate(size, alignof(std::max_align_t));
+}
+
+auto allocate(const std::size_t size, const std::size_t alignment) -> void* {
+  if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
+    throw std::bad_alloc();
+  }
+  void* ptr = detail::memory_allocate(size, alignment);
   if (!ptr) {
     throw std::bad_alloc();  // 如果分配失败，抛出异常
   }

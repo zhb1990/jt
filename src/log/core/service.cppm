@@ -42,6 +42,11 @@ class service {
    */
   JT_API ~service() noexcept;
 
+  service(const service&) = delete;
+  service(service&&) = delete;
+  service& operator=(const service&) = delete;
+  service& operator=(service&&) = delete;
+
   /**
    * 查找日志记录器
    * @param name 日志记录器名称
@@ -106,9 +111,12 @@ class service {
     requires std::same_as<std::ranges::range_value_t<R>, sink_ptr>
   auto create_logger(R&& range, const std::string_view& name, const bool async)
       -> logger_sptr {
-    base::vector<sink_ptr> sinks(
-        std::make_move_iterator(std::ranges::begin(range)),
-        std::make_move_iterator(std::ranges::end(range)));
+    base::vector<sink_ptr> sinks;
+    auto iter = std::ranges::begin(range);
+    const auto end = std::ranges::end(range);
+    for (; iter != end; ++iter) {
+      sinks.push_back(std::ranges::iter_move(iter));
+    }
     return create_logger(name, async, std::move(sinks));
   }
 

@@ -63,6 +63,33 @@ void write_record(jt::log::sink& sink, std::string_view payload,
   sink.flush();
 }
 
+void shutdown_flush_retained_logger() {
+  temporary_directory temp;
+  const auto directory = temp.path.string();
+  const auto archive = (temp.path / "archive").string();
+  std::shared_ptr<jt::log::logger> log;
+  {
+    jt::log::service service;
+    jt::log::sink_file_config config{
+        .name = "shutdown", .directory = directory, .lz4_directory = archive};
+    auto sink = mem::make_dynamic_unique<jt::log::sink, jt::log::sink_file>(
+        service, config);
+    log = service.create_logger(std::array{std::move(sink)}, "shutdown", true);
+    jt::log::info(*log, "short shutdown record");
+    service.clear();
+  }
+  std::size_t files = 0;
+  for (const auto& entry : fs::directory_iterator(temp.path)) {
+    if (entry.path().extension() == ".log") {
+      ++files;
+      check(
+          read(entry.path()).find("short shutdown record") != std::string::npos,
+          "shutdown makes buffered file contents visible with retained logger");
+    }
+  }
+  check(files == 1, "shutdown created one log file");
+}
+
 void rotation_and_manifest() {
   temporary_directory temp;
   const auto directory = temp.path.string();
@@ -134,12 +161,51 @@ void daily_rotation() {
   check(count == 1, "daily rotation");
 }
 
+void midnight_rotation() {
+  using namespace std::chrono;
+  for (const bool restart : {false, true}) {
+    temporary_directory temp;
+    const auto directory = temp.path.string();
+    const auto archive = (temp.path / "archive").string();
+    jt::log::sink_file_config config{.name = "midnight",
+                                     .directory = directory,
+                                     .lz4_directory = archive,
+                                     .max_size = 1024 * 1024,
+                                     .keep_days = 0};
+    const auto midnight =
+        current_zone()->to_sys(local_days{year{2026} / January / 15});
+    {
+      jt::log::service service;
+      auto sink = mem::make_unique<jt::log::sink_file>(service, config);
+      write_record(*sink, "before-midnight", midnight - seconds(1));
+      if (restart) {
+        sink.reset();
+        sink = mem::make_unique<jt::log::sink_file>(service, config);
+      }
+      write_record(*sink, "at-midnight", midnight);
+      const auto current = read(temp.path / "midnight_20260115.log");
+      check(current.find("at-midnight") != std::string::npos &&
+                current.find("before-midnight") == std::string::npos,
+            "midnight record immediately enters new file");
+      write_record(*sink, "after-midnight", midnight + seconds(1));
+    }
+    const auto old =
+        decompress(temp.path / "archive" / "midnight_20260114.log.lz4");
+    check(old.find("before-midnight") != std::string::npos &&
+              old.find("at-midnight") == std::string::npos,
+          "old archive excludes midnight record");
+    const auto current = read(temp.path / "midnight_20260115.log");
+    check(current.find("after-midnight") != std::string::npos,
+          "same day continues in new file");
+  }
+}
+
 void retention_and_expiry() {
   temporary_directory temp;
   const auto archive = temp.path.string();
   const auto old = temp.path / "keep_20000101.log.lz4";
   const auto other = temp.path / "other_20000101.log.lz4";
-  const auto recent = temp.path / "keep_recent.log.lz4";
+  const auto recent = temp.path / "keep_20000102.log.lz4";
   for (const auto& file : {old, other, recent})
     std::ofstream(file) << "fixture";
   const auto past = fs::file_time_type::clock::now() - std::chrono::hours(72);
@@ -161,6 +227,104 @@ void retention_and_expiry() {
         "expired archive client is inert");
 }
 
+void retention_exact_names() {
+  for (const std::string_view name : {"app", "", "app_worker"}) {
+    temporary_directory temp;
+    const auto past = fs::file_time_type::clock::now() - std::chrono::hours(72);
+    const auto prefix = std::string(name) + "_";
+    const auto create_old = [&](const std::string& filename) {
+      const auto path = temp.path / filename;
+      std::ofstream(path) << "fixture";
+      fs::last_write_time(path, past);
+    };
+    for (const auto suffix : {"20000101.log.lz4", "20000101_0001.log.lz4",
+                              "20000101_10000.log.lz4"}) {
+      create_old(prefix + suffix);
+    }
+    mem::vector<std::string> preserved;
+    for (const auto suffix :
+         {"2000010.log.lz4", "200001011.log.lz4", "2000x101.log.lz4",
+          "20000101_.log.lz4", "20000101_001.log.lz4", "20000101_000x.log.lz4",
+          "20000101_0001_extra.log.lz4", "20000101.log.lz4.tmp",
+          "20000101.log"}) {
+      preserved.push_back(prefix + suffix);
+    }
+    for (const auto other : {"application", "app_worker", "_worker", "app"}) {
+      if (name != other) {
+        preserved.push_back(std::string(other) + "_20000101.log.lz4");
+      }
+    }
+    for (const auto& filename : preserved) create_old(filename);
+    const auto recent = temp.path / (prefix + "20000102.log.lz4");
+    std::ofstream(recent) << "recent";
+    const auto directory = temp.path / (prefix + "20000103.log.lz4");
+    fs::create_directory(directory);
+    fs::last_write_time(directory, past);
+    {
+      jt::log::service service;
+      service.make_lz4_client().clear(name, temp.path.string(), 1);
+    }
+    for (const auto suffix : {"20000101.log.lz4", "20000101_0001.log.lz4",
+                              "20000101_10000.log.lz4"}) {
+      check(!fs::exists(temp.path / (prefix + suffix)),
+            "matching expired archive removed");
+    }
+    for (const auto& filename : preserved) {
+      check(fs::exists(temp.path / filename),
+            std::format("cleanup for '{}' preserves '{}'", name, filename));
+    }
+    check(fs::exists(recent), "matching recent archive preserved");
+    check(fs::is_directory(directory), "matching directory preserved");
+  }
+}
+
+void archive_name_collision() {
+  temporary_directory temp;
+  const auto archive = temp.path / "archive";
+  fs::create_directories(archive);
+  const auto first = temp.path / "first" / "same.log";
+  const auto second = temp.path / "second" / "same.log";
+  fs::create_directories(first.parent_path());
+  fs::create_directories(second.parent_path());
+  std::ofstream(first) << "first contents";
+  const auto post = [&](const fs::path& source) {
+    jt::log::service service;
+    service.make_lz4_client().post(source, archive.string());
+  };
+  post(first);
+  const auto final = archive / "same.log.lz4";
+  check(!fs::exists(first), "successful publication removes source");
+  check(decompress(final) == "first contents", "first archive contents");
+  const auto original = read(final);
+  // Different source directory, then reuse the original source filename.
+  for (const auto& source : {second, first}) {
+    std::ofstream(source) << "later contents";
+    post(source);
+    check(read(final) == original, "existing archive is never overwritten");
+    check(read(source) == "later contents", "collision preserves source");
+    check(!fs::exists(archive / "same.log.lz4.tmp"),
+          "collision cleans up owned temporary file");
+  }
+}
+
+void archive_temporary_collision() {
+  temporary_directory temp;
+  const auto source = temp.path / "source.log";
+  const auto temporary = temp.path / "source.log.lz4.tmp";
+  std::ofstream(source) << "source contents";
+  std::ofstream(temporary) << "existing temporary contents";
+  {
+    jt::log::service service;
+    service.make_lz4_client().post(source, temp.path.string());
+  }
+  check(read(source) == "source contents",
+        "temporary collision preserves source");
+  check(read(temporary) == "existing temporary contents",
+        "temporary collision preserves existing file");
+  check(!fs::exists(temp.path / "source.log.lz4"),
+        "temporary collision does not publish");
+}
+
 void publish_failure_preserves_source() {
   temporary_directory temp;
   const auto archive = temp.path / "archive";
@@ -178,9 +342,14 @@ void publish_failure_preserves_source() {
 
 int main() {
   try {
+    shutdown_flush_retained_logger();
     rotation_and_manifest();
     daily_rotation();
+    midnight_rotation();
     retention_and_expiry();
+    retention_exact_names();
+    archive_name_collision();
+    archive_temporary_collision();
     publish_failure_preserves_source();
     std::println("file tests passed");
   } catch (const std::exception& e) {

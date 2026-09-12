@@ -23,6 +23,12 @@
 
 `jt::base` 承载公开基础 API，`jt::log` 承载日志 API，`jt::detail` 只包含内部基础实现。内部 `jt.detail.*` 的点号不表示模块继承；不存在公开 `jt.detail` 聚合入口。
 
+`base_memory_buffer::append` 在扩容前识别来自自身已写入区域的来源，保存相对存储起点的偏移，并在扩容后重新定位。内部来源的完整区间须位于 `[0, write_)`；扩容保留读写位置及该区域内容。此处理不延长调用者持有的旧视图的有效期，也不改变 `channel_buffer` 的固定容量追加行为。
+
+`read_buffer` 先限制跳过增量再推进位置，避免长度相加回绕。动态缓冲区先验证 `write_ + len` 可表示，再计算增长容量；1.5 倍增长无法表示时使用请求容量。不可表示的请求抛出 `std::length_error`，实际分配失败继续抛出 `std::bad_alloc`，两者均不提交缓冲区状态变更。
+
+类型化分配入口将 `alignof(T)`（多态工厂为 `alignof(Derived)`）传至公开的 `allocate(size, alignment)` 重载，再通过私有桥接调用 `mi_malloc_aligned`。单参数入口使用 `alignof(std::max_align_t)`；对齐必须为非零的 2 的幂，否则抛出 `std::bad_alloc`。所有分配继续通过 `mi_usable_size` 统计并由 `mi_free` 释放，构造异常也走同一清理路径。
+
 `jt.base.memory` 的公开定义及内存统计仍在 `memory.cpp` 模块实现中。mimalloc 调用位于普通翻译单元 `src/base/memory_backend.cpp`，该文件不导入 `std` 或 JT 模块。私有桥接头 `memory_backend.h` 不包含系统头文件，使用 `decltype(sizeof(0))` 表示大小类型；模块仅在 global module fragment 中包含该桥接头。这样将 mimalloc 3.3.2 的 `<wchar.h>` 等传递包含与 GCC 的 `std` 模块隔离，避免 macOS 系统声明的 language linkage 冲突。桥接符号不属于公开模块或 DLL API。
 
 logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非导出前向声明与使用它的接口保持同一模块归属。`formatter`、`sink` 和派生 sink 保留独立命名模块，避免回退到项目曾遇到的 GCC Darwin 重复 typeinfo 结构。
@@ -37,14 +43,19 @@ logger 与 service 的前向声明位于 `jt.log.core:fwd`。实现类型的非�
 
 - `service_impl`：logger 注册表、默认 logger 和两个 worker 的生命周期协调。
 - `writer_backend`：消息分配、MPSC 队列、提交计数、写入与刷新；通过友元调用 logger 私有后台接口。
-- `archive_worker`：归档队列、LZ4 上下文、压缩与过期文件清理。
-- 文件 sink：轮转、manifest、文件写入，通过 `service::lz4_client` 提交归档请求。
+- `archive_worker`：归档队列、LZ4 上下文、压缩与过期文件清理。清理先完整匹配 `{name}_{YYYYMMDD}.log.lz4` 或 `{name}_{YYYYMMDD}_{seq}.log.lz4`：名称精确匹配，日期为八位 ASCII 数字，可选序号至少四位 ASCII 数字；空名称遵循相同规则。仅对匹配的普通文件按修改时间判断过期，不使用文件名日期计算期限，其他格式保持不动。
+- 归档先排他创建 `.log.lz4.tmp`，验证并关闭输出后以硬链接原子发布 `.log.lz4`，避免检查存在性后重命名的竞争。发布后清理本次创建的临时文件；目标已存在或文件系统不支持硬链接时报告错误并保留源日志，不回退到覆盖式发布。已有临时文件保持不动。
+- 文件 sink：轮转、manifest、文件写入，每日轮转以本地时间大于或等于下一日零点为边界，通过 `service::lz4_client` 提交归档请求。
 
 内部声明使用 `jt.log.core:message/:service_impl/:writer/:archive` 非导出分区，定义使用 `module jt.log.core;`。LZ4 头文件只存在于归档内部单元；RapidJSON 只用于文件 sink 实现。
 
+归档循环的异常保护覆盖临时队列构造、提取、处理及停止判断；构造失败时报告并重试，尚未提取的请求保留在共享队列。逐消息异常继续隔离，不阻断同批后续请求。
+
 启动时先构造 worker 状态和压缩上下文，再启动 writer，最后启动 archive。archive 线程创建失败时停止并回收 writer；worker 析构提供额外清理保证。
 
-`service::request_stop()` 关闭异步日志提交。writer 完成正在提交的消息并排空队列后通知 archive 停止，archive 排空已接收请求后退出。service 析构时通过内部 `service_impl::wait_stop()` 按 writer、archive 顺序回收线程；`wait_stop()` 不是公开 API。成员声明保证 archive 比 writer 活得更久，注册表在 worker 回收后才释放。同步日志继续保留现有直接调用 sink 的语义。
+`service::request_stop()` 关闭异步日志提交。writer 完成正在提交的消息并排空队列，刷新仍存活的待刷新异步 logger 后通知 archive 停止，archive 排空已接收请求后退出。service 析构时通过内部 `service_impl::wait_stop()` 按 writer、archive 顺序回收线程；`wait_stop()` 不是公开 API。成员声明保证 archive 比 writer 活得更久，注册表在 worker 回收后才释放。同步日志继续保留现有直接调用 sink 的语义。
+
+writer 用弱引用记录已消费但尚未显式刷新的 logger，显式刷新后移除记录，每次排空清理过期记录；注册表移除或替换不影响最终刷新。记录分配失败时立即刷新当前 logger，避免异常逃出工作线程。最终刷新沿用 logger 对各 sink 的异常隔离，不承诺文件系统持久化（fsync）。
 
 logger 消息目标与归档 client 均使用弱引用。只有调用期间临时持有后端；service 销毁后异步提交和归档请求自行失效。请求停止不等于同步 logger 被禁用，也不等于持有 logger 就持有 service。
 

@@ -7,7 +7,8 @@
 - `import jt;`：基础与日志便捷入口。
 - `import jt.base;`：内存、智能指针、缓冲区、容器及概念，命名空间 `jt::base`。
 - `import jt.log;`：logger、service、formatter、控制台与文件 sink，命名空间 `jt::log`。
-- 文件日志支持大小/日期轮转、manifest 恢复、LZ4 归档和过期清理。
+- 文件日志支持大小/日期轮转、manifest 恢复、LZ4 归档和过期清理；清理仅处理名称及日期/序号结构完整匹配的归档，保留格式不匹配的文件。
+- 归档发布不覆盖已有目标；同名冲突或文件系统不支持硬链接时保留源日志并报告错误，已有临时文件也不会被覆盖。
 - 协程、网络、Actor 尚未实现；当前没有对应模块或构建开关。
 
 ## 构建
@@ -59,6 +60,13 @@ ctest --test-dir build/custom --output-on-failure
 
 ## 消费库
 
+
+`allocator<T>`、`make_unique<T>` 和 `make_dynamic_unique<Base, Derived>` 按实际对象类型的对齐要求分配内存，支持高对齐类型。原始内存可使用 `allocate(size, alignment)`，alignment 必须为非零的 2 的幂，释放仍调用 `deallocate`。
+
+`jt::base::base_memory_buffer` 支持追加自身已写入区域的完整内容或子区间，例如 `buffer.append(std::string_view(buffer))`，扩容时也能正确复制。追加后若发生扩容，调用者持有的旧指针和视图会失效，应重新获取。
+
+`base_memory_buffer` 支持不同固定容量之间的复制构造和赋值（例如 `buffer_1k` 与 `buffer_2k`），保留读写位置及已写入内容，并按需扩容。
+
 在同一 CMake 构建中使用 `add_subdirectory` 或 FetchContent 引入项目，然后链接 `jt::jt`。该别名对应共享库 `libjt`，公开传递 C++23 编译要求和模块文件集。消费工程同样需要在创建目标前配置 `import std` 支持（包括相应 CMake experimental gate 和 `CMAKE_CXX_MODULE_STD=ON`）。目前不提供安装包，也不分发跨工具链通用 BMI。
 
 ```cmake
@@ -84,9 +92,11 @@ int main() {
 }
 ```
 
-`service` 构造时启动后台线程，`request_stop()` 关闭异步提交，析构时等待写入与归档排空；无需调用 `start()`，也没有公开的 `wait_stop()`。logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
+`service` 构造时启动后台线程，`request_stop()` 关闭异步提交，析构时等待写入排空、刷新仍存活的异步 logger 的待刷新 sink，并等待归档排空；无需调用 `start()`，也没有公开的 `wait_stop()`。logger 只通过 `service::create_logger` 创建，返回 `std::shared_ptr<logger>`；日志辅助函数接收 `logger&`。异步 logger 和文件 sink 的归档句柄不延长 service 生命周期。应用应先停止日志生产者，最后销毁日志 service。
 
 `import jt.log.format;` 提供向 `jt::base::buffer_1k` 追加的 `jt::log::format_to(buffer, fmt, args...)` 和 `jt::log::vformat_to(buffer, fmt, format_args)`，也由 `jt.log` 和 `jt` 再导出。前者保留编译期格式串检查，后者接受运行时格式串；二者同步格式化并向调用者传播异常，日志和控制台辅助函数继续捕获异常。运行时格式化引擎及本地时间格式化集中在单个实现单元，避免已复现的 GCC 16.2 / MinGW `import std` 重复定义，不依赖 `--allow-multiple-definition`。用户自己的标准库格式化调用及自定义 `std::formatter` 内部实现仍受工具链限制。
+
+`create_logger` 的范围重载支持迭代器与 sentinel 类型不同的输入范围，逐项移动 sink 并保持顺序。缓冲区跳过操作按剩余长度饱和；请求不可表示的可写容量时抛出 `std::length_error`，保留原内容和读写位置。每日文件轮转包含恰好次日零点的边界。归档线程隔离临时队列分配及单条请求的异常。
 
 ## 目录
 

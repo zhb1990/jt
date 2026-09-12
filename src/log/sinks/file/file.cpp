@@ -68,7 +68,7 @@ class sink_file_imp {
     auto local_point = zone->to_local(point);
 
     // 检查是否需要进行日志轮换（基于时间或文件大小）
-    if (tomorrow_ < local_point) {
+    if (local_point >= tomorrow_) {
       const auto old_day = manifest_.day;
       tomorrow_ = std::chrono::floor<std::chrono::days>(local_point) +
                   std::chrono::days(1);

@@ -41,7 +41,7 @@ static_assert(jt::base::writable_buffer<decltype(buffer)>);
 | 基线用法 | 当前用法 |
 |---|---|
 | `service.start()` | 删除调用；构造 service 即启动工作线程 |
-| `service.stop()` | `service.request_stop()` 请求关闭异步提交；service 析构时等待排空和线程退出 |
+| `service.stop()` | `service.request_stop()` 请求关闭异步提交；service 析构时等待排空、最终 sink 刷新和线程退出 |
 | 直接构造 logger | 使用 `service.create_logger(...)`，返回 `std::shared_ptr<logger>` |
 | `info(log, fmt, args...)` 等接受 shared_ptr 的辅助函数 | `info(*log, fmt, args...)`；所有级别及 `vinfo` 等运行时格式辅助函数接收 `logger&` |
 | `create_logger(name, async, sinks)` 的 vector 重载 | 传入 `std::move(sinks)`；该重载改为按值接收，范围重载仍移动范围元素 |
@@ -53,7 +53,7 @@ static_assert(jt::base::writable_buffer<decltype(buffer)>);
 
 `message` 及队列字段已成为私有实现。自定义 formatter 将 `sid/tid/point/buf` 分别改为记录视图的 `service_id/thread_id/timestamp/payload`；`lv`、`source` 保留。`payload` 是借用的 `std::string_view`，不能跨调用保留其内容引用。自定义 sink 的 `write` 参数改用 `jt::base::buffer_1k`；`write` 和 `flush_unlock` 是 protected 扩展点，外部使用 `consume` 和 `flush`。
 
-日志时间改为本地时间并输出 UTC 偏移，解析日志的程序需适配。异步 logger 和归档 client 使用弱句柄，保留它们不会延长 service 生命周期；先停止日志生产者，再销毁 service。`request_stop()` 不等待完成，也不禁用同步 logger；没有公开的 `wait_stop()`。
+日志时间改为本地时间并输出 UTC 偏移，解析日志的程序需适配。异步 logger 和归档 client 使用弱句柄，保留它们不会延长 service 生命周期；先停止日志生产者，再销毁 service。关闭时会刷新仍存活的异步 logger 已消费但未刷新的 sink，即使 logger 已从注册表移除；无需依赖 logger 析构。`request_stop()` 不等待完成，也不禁用同步 logger；没有公开的 `wait_stop()`。
 
 ## 构建
 
@@ -65,6 +65,21 @@ CMake 消费目标推荐链接 `jt::jt`，原目标 `libjt` 保留。删除旧�
 
 ## 独立修复
 
+
+内存分配新增 `allocate(size, alignment)` 重载，单参数入口保留。分配器和智能指针工厂自动传递实际对象类型的对齐要求（多态工厂使用 `alignof(Derived)`）；调用方式不变，需重建库、BMI 和消费者。
+
+`base_memory_buffer` 自追加在堆扩容时不再读取已释放的来源存储；完整可读视图及已写入区域的子区间均支持。调用方式不变，扩容后仍需重新获取外部持有的指针或视图。模板修复需要重新生成 BMI 并重建消费者。
+
 GCC 16.2 / MinGW 的 `import std` 重复定义通过集中格式化实现及移除不必要的 `condition_variable_any` 修复，不再使用 `--allow-multiple-definition`。新增 `jt.log.format` 公开模块，由 `jt.log` 和 `jt` 再导出；需要自行格式化到 `buffer_1k` 时，可将 `std::format_to(std::back_inserter(buffer), fmt, args...)` 改为 `jt::log::format_to(buffer, fmt, args...)`。运行时格式串使用 `jt::log::vformat_to(buffer, fmt, std::make_format_args(args...))`，参数存储必须在整个调用期间有效。此处同步消费借用参数，异步日志仍提交格式化后的缓冲区。更新后需重新生成 BMI 并重建消费者。
 
-迁移前的文件回归测试暴露了原归档发布错误：`replace_extension` 原地修改临时路径，最终重命名失败仍可能删除源日志。现在保持 `.log.lz4.tmp` 与 `.log.lz4` 路径独立，验证并关闭输出后重命名，只在成功发布后删除源日志。重命名失败时保留源日志与临时归档供排查。此修复不修改轮转和保留策略。
+迁移前的文件回归测试暴露了原归档发布错误：`replace_extension` 原地修改临时路径，最终重命名失败仍可能删除源日志。现在保持 `.log.lz4.tmp` 与 `.log.lz4` 路径独立，排他创建临时文件，验证并关闭输出后通过硬链接原子发布，只在成功发布后删除源日志。已有最终归档或临时文件不会被覆盖；发布失败时保留源日志并清理本次创建的临时文件。归档目录所在文件系统需支持硬链接，否则报告失败并保留源日志。此修复不修改轮转和保留策略。
+
+过期归档清理由名称前缀筛选收紧为完整命名格式匹配：`{name}_{YYYYMMDD}[_{seq}].log.lz4`，其中日期为八位数字，序号至少四位数字。`app` 不再清理 `app_worker` 的归档，空名称仅匹配自身日期/序号结构；不符合格式的历史文件需自行管理。公开接口、生成文件名和基于修改时间的保留期限不变。
+
+不同固定容量的 `base_memory_buffer` 之间复制构造和赋值已修复 protected 成员访问错误；调用方式不变，保留读写位置及已写入内容。需重新生成 BMI 并重建消费者。
+
+## 范围与边界修复
+
+`create_logger` 保留 `input_range` 接口并支持独立 sentinel，范围元素仍按顺序移动。`make_sure_writable` 对不可表示的容量抛出 `std::length_error`；分配失败仍为 `std::bad_alloc`，失败后内容、容量及读写位置不变。`read_buffer` 的超长跳过饱和到末尾。
+
+每日轮转将恰好午夜的记录写入新日期文件。归档循环也捕获临时队列构造异常。以上无需修改调用方式，但模板变化要求重建库、BMI 及消费者。

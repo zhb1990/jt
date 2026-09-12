@@ -76,7 +76,7 @@ class JT_API read_buffer {
 
   // 跳过指定字节数。
   constexpr auto operator+=(const std::size_t bytes) noexcept -> read_buffer& {
-    read_ = (std::min)(read_ + bytes, capacity_);
+    read_ += (std::min)(bytes, readable());
     return *this;
   }
 
@@ -296,10 +296,10 @@ class JT_API base_memory_buffer : public channel_buffer {
   template <std::size_t FixedOther>
   explicit base_memory_buffer(const base_memory_buffer<FixedOther>& other)
       : base_memory_buffer(0) {
-    reserve(other.capacity_);
-    read_ = other.read_;
-    write_ = other.write_;
-    std::memcpy(data_, other.data_, write_);
+    reserve(other.capacity());
+    read_ = other.prependable();
+    write_ = read_ + other.readable();
+    std::memcpy(data_, other.data(), write_);
   }
 
   base_memory_buffer(base_memory_buffer&& other) noexcept {
@@ -360,8 +360,11 @@ class JT_API base_memory_buffer : public channel_buffer {
   }
 
   void make_sure_writable(const std::size_t len) {
-    if (const auto sz = writable(); sz < len) {
-      grow(capacity_ + len - sz);
+    if (len > std::numeric_limits<std::size_t>::max() - write_) {
+      throw std::length_error("buffer capacity overflow");
+    }
+    if (len > writable()) {
+      grow(write_ + len);
     }
   }
 
@@ -379,10 +382,10 @@ class JT_API base_memory_buffer : public channel_buffer {
   template <std::size_t FixedOther>
   auto operator=(const base_memory_buffer<FixedOther>& other)
       -> base_memory_buffer& {
-    reserve(other.capacity_);
-    read_ = other.read_;
-    write_ = other.write_;
-    std::memcpy(data_, other.data_, write_);
+    reserve(other.capacity());
+    read_ = other.prependable();
+    write_ = read_ + other.readable();
+    std::memcpy(data_, other.data(), write_);
     return *this;
   }
 
@@ -416,7 +419,20 @@ class JT_API base_memory_buffer : public channel_buffer {
   }
 
   void append(const void* buf, const std::size_t len) {
-    make_sure_writable(len);
+    if (len == 0) return;
+
+    if (len > writable()) {
+      const std::less<const void*> less;
+      const auto* data = static_cast<const std::uint8_t*>(data_);
+      if (!less(buf, data) && less(buf, data + write_)) {
+        // grow() preserves [0, write_) but may release the source storage.
+        const auto offset = static_cast<const std::uint8_t*>(buf) - data;
+        make_sure_writable(len);
+        buf = static_cast<const std::uint8_t*>(data_) + offset;
+      } else {
+        make_sure_writable(len);
+      }
+    }
     return channel_buffer::append(buf, len);
   }
 
@@ -456,12 +472,10 @@ class JT_API base_memory_buffer : public channel_buffer {
   // 扩容为原容量的 1.5 倍，或至少 size。
   void grow(const std::size_t size) {
     constexpr auto max_size = static_cast<std::size_t>(-1);
-    std::size_t new_capacity = capacity_ + capacity_ / 2;
-    if (size > new_capacity) {
-      new_capacity = size;
-    } else if (new_capacity > max_size) {
-      new_capacity = size > max_size ? size : max_size;
-    }
+    const auto increment = capacity_ / 2;
+    const auto new_capacity = increment > max_size - capacity_
+                                  ? size
+                                  : (std::max)(size, capacity_ + increment);
 
     auto* old_data = data_;
     void* new_data = allocate(new_capacity);

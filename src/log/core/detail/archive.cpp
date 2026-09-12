@@ -83,7 +83,8 @@ void lz4_data::compress(const base::string& src,
   std::filesystem::path path_dest = u8strv;
   path_dest /= path_src.filename();
   path_dest.replace_extension(".log.lz4.tmp");
-  output.open(path_dest, std::ios_base::binary | std::ios_base::trunc);
+  // Exclusively own the temporary file, including across service instances.
+  output.open(path_dest, std::ios_base::binary | std::ios_base::noreplace);
   if (!output.is_open()) {
     print_stderr("{}: compress open output fail\n", src);
     return;
@@ -108,15 +109,24 @@ void lz4_data::compress(const base::string& src,
     return;
   }
 
-  std::error_code ec_rename;
+  std::error_code ec_publish;
   auto path_final = path_dest;
-  path_final
-      .replace_extension();  // Remove only .tmp; preserve the source path.
-  std::filesystem::rename(path_dest, path_final, ec_rename);
-  if (ec_rename) {
-    print_stderr("{}: publish archive fail, {}\n", src, ec_rename.message());
-    return;
+  path_final.replace_extension();  // Remove only .tmp.
+  // Creating a hard link atomically fails if the final name already exists.
+  // An exists() check followed by rename() would still allow overwrites.
+  std::filesystem::create_hard_link(path_dest, path_final, ec_publish);
+  if (ec_publish) {
+    print_stderr("{}: publish archive fail, {}\n", src, ec_publish.message());
   }
+  // Remove only our exclusively created temporary file. On publication
+  // failure the source remains available for recovery or retry.
+  std::error_code ec_cleanup;
+  std::filesystem::remove(path_dest, ec_cleanup);
+  if (ec_cleanup) {
+    print_stderr("{}: remove archive temporary file fail, {}\n", src,
+                 ec_cleanup.message());
+  }
+  if (ec_publish) return;
 
   if (count_in > 0) {
     auto cost = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -232,6 +242,25 @@ void archive_worker::push_lz4_message(lz4_message& msg) {  // NOLINT
   lz4_cv_.notify_one();
 }
 
+static bool matches_archive_name(std::string_view filename,
+                                 const std::string_view name) noexcept {
+  constexpr std::string_view extension = ".log.lz4";
+  if (!filename.starts_with(name)) return false;
+  filename.remove_prefix(name.size());
+  if (!filename.starts_with('_') || !filename.ends_with(extension))
+    return false;
+  filename.remove_prefix(1);
+  if (filename.size() < 8 + extension.size()) return false;
+  filename.remove_suffix(extension.size());
+  const auto is_digit = [](const char c) { return c >= '0' && c <= '9'; };
+  if (!std::ranges::all_of(filename.substr(0, 8), is_digit)) return false;
+  filename.remove_prefix(8);
+  if (filename.empty()) return true;
+  // Sequence formatting uses a minimum width of four digits, with no maximum.
+  return filename.size() >= 5 && filename.front() == '_' &&
+         std::ranges::all_of(filename.substr(1), is_digit);
+}
+
 void archive_worker::clear_lz4_files(const lz4_message& msg) {  // NOLINT
   if (msg.keep_days == 0) return;
 
@@ -267,7 +296,6 @@ void archive_worker::clear_lz4_files(const lz4_message& msg) {  // NOLINT
                         msg.lz4_directory, ec.message());
   }
 
-  base::string filename_start = msg.file_name + "_";
   const fs::directory_iterator dir_end{};
   for (; iter != dir_end; iter.increment(ec)) {
     if (ec) {
@@ -294,7 +322,7 @@ void archive_worker::clear_lz4_files(const lz4_message& msg) {  // NOLINT
       continue;
     }
 
-    if (!strv.starts_with(filename_start) || !strv.ends_with(".log.lz4")) {
+    if (!matches_archive_name(strv, msg.file_name)) {
       continue;
     }
 
@@ -320,39 +348,39 @@ void archive_worker::clear_lz4_files(const lz4_message& msg) {  // NOLINT
 
 void archive_worker::lz4_run() {  // NOLINT(*-make-member-function-const)
   while (true) {
-    base::deque<lz4_message> queue;
-    bool stop_requested = false;
     try {
-      std::unique_lock lock{lz4_mutex_};
-      lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
-        return !lz4_queue_.empty() || lz4_stop_requested_;
-      });
-      queue = std::move(lz4_queue_);
-      stop_requested = lz4_stop_requested_;
+      base::deque<lz4_message> queue;
+      bool stop_requested = false;
+      {
+        std::unique_lock lock{lz4_mutex_};
+        lz4_cv_.wait_for(lock, std::chrono::seconds(2), [this] {
+          return !lz4_queue_.empty() || lz4_stop_requested_;
+        });
+        queue = std::move(lz4_queue_);
+        stop_requested = lz4_stop_requested_;
+      }
+
+      for (auto& msg : queue) {
+        try {
+          if (msg.tp == lz4_message::type::lz4) {
+            lz4_data_.compress(msg.file_name, msg.lz4_directory);
+          } else if (msg.tp == lz4_message::type::clear) {
+            clear_lz4_files(msg);
+          }
+        } catch (const std::exception& e) {
+          print_stderr("lz4 worker exception: {}\n", e.what());
+          // 异常可能发生在 compressBegin 之后：这里再 reset_ctx()
+        } catch (...) {
+          print_stderr("lz4 worker unknown exception\n");
+        }
+      }
+
+      if (stop_requested) break;
     } catch (const std::exception& e) {
       print_stderr("lz4 worker exception: {}\n", e.what());
-      continue;
     } catch (...) {
       print_stderr("lz4 worker unknown exception\n");
-      continue;
     }
-
-    for (auto& msg : queue) {
-      try {
-        if (msg.tp == lz4_message::type::lz4) {
-          lz4_data_.compress(msg.file_name, msg.lz4_directory);
-        } else if (msg.tp == lz4_message::type::clear) {
-          clear_lz4_files(msg);
-        }
-      } catch (const std::exception& e) {
-        print_stderr("lz4 worker exception: {}\n", e.what());
-        // 异常可能发生在 compressBegin 之后：这里再 reset_ctx()
-      } catch (...) {
-        print_stderr("lz4 worker unknown exception\n");
-      }
-    }
-
-    if (stop_requested) break;
   }
 }
 

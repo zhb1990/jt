@@ -13,6 +13,7 @@ struct state {
   std::atomic<int> destroyed{0};
   std::atomic<int> formatter_destroyed{0};
   std::atomic<int> flushes{0};
+  std::size_t flushed_lines{0};
   std::uint_least32_t source_line{0};
 };
 
@@ -42,7 +43,10 @@ struct capture_sink final : jt::log::sink {
     std::lock_guard lock(s.mutex);
     s.lines.emplace_back(std::string_view(buffer));
   }
-  void flush_unlock() override { ++s.flushes; }
+  void flush_unlock() override {
+    s.flushed_lines = s.lines.size();
+    ++s.flushes;
+  }
   state& s;
 };
 
@@ -97,6 +101,148 @@ void memory_and_buffer() {
   }
   check(mem::allocated_memory() == before,
         "memory balance and throwing constructor cleanup");
+}
+
+void buffer_self_append() {
+  const auto before = mem::allocated_memory();
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.append("abcdefgh");
+    const auto capacity = buffer.capacity();
+    buffer.append(std::string_view(buffer));
+    check(buffer.capacity() > capacity, "self append grows heap storage");
+    check(std::string_view(buffer) == "abcdefghabcdefgh" &&
+              buffer.readable() == 16 && buffer.prependable() == 0,
+          "heap self append preserves all bytes");
+  }
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.append("abcdefgh");
+    buffer.read(2);
+    const auto capacity = buffer.capacity();
+    buffer.append(std::string_view(buffer).substr(1, 4));
+    check(buffer.capacity() > capacity && buffer.prependable() == 2 &&
+              buffer.readable() == 10 &&
+              std::string_view(buffer) == "cdefghdefg",
+          "self append relocates a substring after reading");
+  }
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.append("abcdefgh");
+    buffer.read(2);
+    const auto capacity = buffer.capacity();
+    buffer.append(mem::read_buffer(buffer));
+    check(buffer.capacity() > capacity && buffer.prependable() == 2 &&
+              std::string_view(buffer) == "cdefghcdefgh",
+          "read buffer self append grows heap storage");
+  }
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.append("abcdefgh");
+    buffer.read(3);
+    const auto capacity = buffer.capacity();
+    // Include consumed bytes: offsets are relative to data(), not begin_read().
+    buffer.append(static_cast<const std::uint8_t*>(buffer.data()) + 1, 5);
+    check(buffer.capacity() > capacity && buffer.prependable() == 3 &&
+              std::string_view(buffer) == "defghbcdef",
+          "pointer self append preserves storage-relative offsets");
+  }
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.append("abc");
+    buffer.append(std::string_view(buffer));
+    check(buffer.capacity() > 4 && std::string_view(buffer) == "abcabc",
+          "self append grows inline storage");
+  }
+  {
+    mem::base_memory_buffer<4> buffer;
+    buffer.reserve(32);
+    buffer.append("abcdefgh");
+    const auto capacity = buffer.capacity();
+    buffer.append(std::string_view(buffer));
+    check(buffer.capacity() == capacity &&
+              std::string_view(buffer) == "abcdefghabcdefgh",
+          "self append without growth");
+    buffer.append(std::string_view{});
+    buffer.append(mem::read_buffer{});
+    buffer.append(nullptr, 0);
+    check(buffer.capacity() == capacity && buffer.prependable() == 0 &&
+              std::string_view(buffer) == "abcdefghabcdefgh",
+          "empty append leaves contents unchanged");
+  }
+  check(mem::allocated_memory() == before, "self append memory balance");
+}
+
+void buffer_boundaries() {
+  constexpr auto maximum = std::numeric_limits<std::size_t>::max();
+  constexpr auto saturated = [] {
+    mem::read_buffer reader("abcd");
+    reader += 2;
+    reader += std::numeric_limits<std::size_t>::max();
+    return reader.readable();
+  }();
+  static_assert(saturated == 0);
+  mem::read_buffer reader("abcd");
+  reader += 1;
+  reader += 1;
+  reader += maximum;
+  reader += maximum;
+  check(reader.readable() == 0, "skip saturates without wrapping");
+  mem::base_memory_buffer<4> buffer;
+  buffer.append("ab");
+  buffer.read(1);
+  auto* data = buffer.data();
+  bool threw = false;
+  try {
+    buffer.make_sure_writable(maximum);
+  } catch (const std::length_error&) {
+    threw = true;
+  }
+  check(threw && buffer.data() == data && buffer.capacity() == 4 &&
+            buffer.prependable() == 1 && buffer.writable() == 2 &&
+            std::string_view(buffer) == "b",
+        "unrepresentable capacity preserves buffer state");
+  buffer.make_sure_writable(8);
+  check(buffer.writable() >= 8 && buffer.prependable() == 1 &&
+            std::string_view(buffer) == "b",
+        "normal growth preserves positions and contents");
+}
+
+struct ordered_sink final : jt::log::sink {
+  ordered_sink(mem::vector<int>& order, int id) : order(order), id(id) {}
+  void write(jt::log::level, const time_point&, const mem::buffer_1k&,
+             std::size_t, std::size_t) override {
+    order.push_back(id);
+  }
+  void flush_unlock() override {}
+  mem::vector<int>& order;
+  int id;
+};
+
+void logger_ranges() {
+  mem::vector<int> order;
+  jt::log::service service;
+  auto sinks = std::array{
+      mem::make_dynamic_unique<jt::log::sink, ordered_sink>(order, 1),
+      mem::make_dynamic_unique<jt::log::sink, ordered_sink>(order, 2)};
+  auto range = std::ranges::subrange(std::counted_iterator(sinks.begin(), 2),
+                                     std::default_sentinel);
+  static_assert(std::ranges::input_range<decltype(range)>);
+  static_assert(!std::ranges::common_range<decltype(range)>);
+  auto log = service.create_logger(range, "sentinel", false);
+  check(!sinks[0] && !sinks[1], "range transfers sink ownership");
+  jt::log::info(*log, "ordered");
+  check(order == mem::vector<int>{1, 2}, "range preserves sink order");
+  auto empty = std::ranges::subrange(std::counted_iterator(sinks.begin(), 0),
+                                     std::default_sentinel);
+  auto empty_log = service.create_logger(empty, "empty", false);
+  jt::log::info(*empty_log, "empty");
+  auto common = std::array{
+      mem::make_dynamic_unique<jt::log::sink, ordered_sink>(order, 3)};
+  auto common_log = service.create_logger(common, "common", false);
+  jt::log::info(*common_log, "common");
+  check(!common[0] && order == mem::vector<int>{1, 2, 3},
+        "common and empty ranges preserve behavior");
 }
 
 void synchronous() {
@@ -160,6 +306,35 @@ void asynchronous() {
   check(s.destroyed == 1, "retained logger destruction");
 }
 
+void shutdown_flush() {
+  state first, second;
+  std::shared_ptr<jt::log::logger> first_log, second_log;
+  {
+    jt::log::service service;
+    first_log = make_logger(service, first, true);
+    jt::log::info(*first_log, "already consumed");
+    // A later explicit flush is a FIFO barrier for the first logger's write.
+    second_log = make_logger(service, second, true);
+    second_log->flush();
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (second.flushes.load() == 0 &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::yield();
+    }
+    check(second.flushes == 1, "writer reached FIFO barrier");
+    check(first.flushes == 0, "consumption does not flush implicitly");
+    service.clear();
+    jt::log::info(*second_log, "drain before final flush");
+  }
+  check(first.flushes == 1 && first.flushed_lines == 1,
+        "shutdown flushes an already consumed unregistered logger");
+  check(second.flushes == 2 && second.flushed_lines == 1,
+        "shutdown flush follows remaining writes after explicit flush");
+  check(first.destroyed == 0 && second.destroyed == 0,
+        "shutdown flush does not require sink destruction");
+}
+
 void stop_race() {
   state s;
   std::shared_ptr<jt::log::logger> log;
@@ -187,8 +362,12 @@ void stop_race() {
 int main() {
   try {
     memory_and_buffer();
+    buffer_self_append();
+    buffer_boundaries();
+    logger_ranges();
     synchronous();
     asynchronous();
+    shutdown_flush();
     stop_race();
     std::println("behavior tests passed");
   } catch (const std::exception& e) {

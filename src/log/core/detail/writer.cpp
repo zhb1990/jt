@@ -105,8 +105,16 @@ inline void writer_backend::writer_do_message() {
       if (const auto ptr = msg->target.lock()) {
         if (msg->type == message_type::log) {
           ptr->backend_log(msg->record());
+          try {
+            dirty_loggers_.insert_or_assign(ptr.get(), ptr);
+          } catch (...) {
+            // If tracking cannot allocate, flush now rather than lose the
+            // shutdown flush guarantee or let an exception escape the worker.
+            ptr->backend_flush();
+          }
         } else {
           ptr->backend_flush();
+          dirty_loggers_.erase(ptr.get());
         }
       }
 
@@ -117,6 +125,8 @@ inline void writer_backend::writer_do_message() {
 
     std::tie(msg, is_empty) = writer_queue_.pop_front();
   }
+  std::erase_if(dirty_loggers_,
+                [](const auto& entry) { return entry.second.expired(); });
 }
 
 void writer_backend::writer_run() {
@@ -141,6 +151,10 @@ void writer_backend::writer_run() {
       }
 
       writer_do_message();
+      for (const auto& [target, weak] : dirty_loggers_) {
+        if (const auto ptr = weak.lock()) ptr->backend_flush();
+      }
+      dirty_loggers_.clear();
 
       // No more file rotations can be submitted by this writer.
       archive_.request_stop();

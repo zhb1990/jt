@@ -2,6 +2,7 @@ module jt.log.core:writer;
 
 import std;
 import jt.base.memory;
+import jt.base.containers;
 import jt.base.buffer;
 import jt.detail.intrusive_mpsc_queue;
 import jt.log.level;
@@ -41,6 +42,8 @@ class writer_backend {
   std::atomic_bool writer_stop_requested_{false};
   std::atomic<std::ptrdiff_t> writer_submission_counter_{0};
   base::allocator<message> message_allocator_{};
+  // Accessed only by the writer thread; does not retain loggers or sinks.
+  base::unordered_map<logger*, logger_wptr> dirty_loggers_;
 };
 
 }  // namespace jt::log

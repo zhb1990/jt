@@ -16,6 +16,13 @@ export namespace jt::base {
 JT_API auto allocate(std::size_t size) -> void*;
 
 /**
+ * 按指定对齐分配原始内存，仍使用 deallocate 释放
+ * @param size 要分配的字节数
+ * @param alignment 非零的 2 的幂；非法值抛出 std::bad_alloc
+ */
+JT_API auto allocate(std::size_t size, std::size_t alignment) -> void*;
+
+/**
  * 获取已分配内存的实际大小
  * @param ptr 内存指针
  * @return 实际分配的字节数
@@ -72,7 +79,7 @@ class allocator {
       throw std::bad_alloc();
     }
 
-    void* ptr = base::allocate(sizeof(T) * count);
+    void* ptr = base::allocate(sizeof(T) * count, alignof(T));
     return static_cast<T*>(ptr);
   }
 
@@ -193,7 +200,7 @@ using unique_ptr = std::unique_ptr<T, deleter<T>>;
 template <typename T, typename... Types>
   requires(!std::is_array_v<T>)
 auto make_unique(Types&&... args) -> unique_ptr<T> {
-  auto* mem = allocate(sizeof(T));
+  auto* mem = allocate(sizeof(T), alignof(T));
   try {
     auto* ptr = ::new (mem) T(std::forward<Types>(args)...);
     return unique_ptr<T>(ptr, deleter<T>());
@@ -246,7 +253,7 @@ template <typename Base, typename Derived, typename... Types>
   requires(std::is_base_of_v<Base, Derived> &&
            std::has_virtual_destructor_v<Base>)
 auto make_dynamic_unique(Types&&... args) -> dynamic_unique_ptr<Base> {
-  auto* mem = allocate(sizeof(Derived));
+  auto* mem = allocate(sizeof(Derived), alignof(Derived));
   try {
     auto* ptr = ::new (mem) Derived(std::forward<Types>(args)...);
     return dynamic_unique_ptr<Base>{ptr, {mem}};
